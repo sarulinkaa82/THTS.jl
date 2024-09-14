@@ -1,0 +1,7 @@
+name = "THTS"
+uuid = "6a918302-f22c-4708-a42c-c3d98e732581"
+authors = ["sarulinkaa82"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.9"
