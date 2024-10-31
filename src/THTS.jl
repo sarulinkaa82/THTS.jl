@@ -1,9 +1,20 @@
 module THTS
 
-# Write your package code here.
-export greet
+# using POMDPs, POMDPModels
+# using POMDPTools
 
-greet() = print("Hello World!")
+include("vanilla.jl")
+
+export 
+    greet
+    solve
+    StateNode
+end
+
+function greet()
+    print("hello")
+end
+
 
 
 end
