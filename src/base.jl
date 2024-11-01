@@ -1,6 +1,10 @@
-using Revise
-using POMDPs, POMDPTools
-using POMDPModels
+
+using POMDPs
+using POMDPLinter
+using POMDPTools
+using StatsBase
+
+
 
 
 mutable struct THTSTree{S,A}
@@ -20,7 +24,7 @@ mutable struct THTSTree{S,A}
     c_children::Vector{Dict{Int, Float64}}
 
     # Constructor to initialize empty dictionaries and arrays
-    function THTSTree()
+    function THTSTree{S, A}() where  {S, A}
         new(
             Dict{S, Int}(),
             Dict{Tuple{S, A}, Int}(),
@@ -34,11 +38,10 @@ mutable struct THTSTree{S,A}
             Vector{Dict{Int, Float64}}()
         )
     end
-
 end
 
 
-function add_decision_node(tree::THTSTree{S, A}, state::S)
+function add_decision_node(tree::THTSTree{S, A}, state::S) where {S, A}
     if !haskey(tree.d_node_ids, state)
         state_id = length(tree.d_node_ids) + 1
         tree.d_node_ids[state] = state_id
@@ -49,7 +52,7 @@ function add_decision_node(tree::THTSTree{S, A}, state::S)
     end
 end
 
-function add_chance_node(tree::THTSTree{S, A}, state::S, action::A)
+function add_chance_node(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
     state_action = (state, action)
     if !haskey(tree.c_node_ids, state_action)
         action_id = length(tree.c_node_ids) + 1
@@ -61,7 +64,7 @@ function add_chance_node(tree::THTSTree{S, A}, state::S, action::A)
     end
 end
 
-function get_decision_id(tree::Tree{S, A}, state::S)
+function get_decision_id(tree::THTSTree{S, A}, state::S) where {S, A}
     if !haskey(tree.d_node_ids, state)
         add_decision_node(tree, state)
     end
@@ -70,7 +73,7 @@ function get_decision_id(tree::Tree{S, A}, state::S)
 end
 
 
-function get_chance_id(tree::Tree{S, A}, state::S, action::A)
+function get_chance_id(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
     state_action = (state, action)
     if !haskey(tree.c_node_ids, state_action)
         add_chance_node(tree, state, action)
@@ -80,7 +83,7 @@ function get_chance_id(tree::Tree{S, A}, state::S, action::A)
 end
 
 
-function add_transition(tree::Tree{S, A}, state::S, action::A, next_state::S, probability::Float64)
+function add_transition(tree::THTSTree{S, A}, state::S, action::A, next_state::S, probability::Float64) where {S, A}
     state_id = get_decision_id(tree, state)
     next_state_id = get_decision_id(tree, next_state)
     action_id = get_chance_id(tree, state, action)
@@ -111,7 +114,17 @@ Selects outcoming next state base on the probability of the outcomes
 Return decision_id::Int of the next decision node
 """
 function select_outcome(outcomes::Dict{S, Float64})
-    nothing
+    next_nodes = Vectpr{Int}()
+    weights = Vector{Float64}()
+    for (decision_node_id, prob) in outcomes
+        push!(next_nodes, decision_node_id)
+        push!(weights, Float64(prob))
+    end
+
+    w = Weights(weights)
+    next_state_id = sample(next_states, w)
+    # println(next_state_id)
+    return next_state_id
 end
 
 """
@@ -137,20 +150,27 @@ function simulate(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
     nothing
 end
 
-"""
-Returns next_states::Dict{S, Float64} dictionary containing next states and probabilities of transitioning into them
-"""
-function get_next_states(tree::THTSTree{S, A}, node_id::Int)
-    nothing
-end
 
 """
 Chooses greedy action for a state of the decision node\n
 Returns action::A
 """
 function greedy_action(tree::THTSTree{S, A}, node_id)
-    nothing
+    children_c_nodes = tree.d_children[node_id]
+    
+    max_q = -Inf
+    max_act = Nothing
+    for chance_node_id in children_c_nodes
+        if tree.c_qvalues[chance_node_id] > max_q
+            max_q = tree.c_qvalues[chance_node_id]
+            (s, a) = tree.state_actions[chance_node_id]
+            max_act = a
+        end
+    end
+
+    return max_act
 end
+
 
 
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) end
@@ -158,7 +178,16 @@ function visit_c_node(tree::THTSTree{S, A}, node_id::Int) end
 
 function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
     if tree.d_visits[node_id] == 0
-        # add expand the children
+        # expand the children
+        state = tree.states[node_id]
+        acts = actions(mdp, state)
+
+        for a in acts # create chance node, add it to d_nodes children
+            add_chance_node(tree, state, a)
+            chance_id = get_chance_id(tree, state, a)
+            push!(tree.d_children[node_id], chance_id)
+        end
+
         res = simulate(tree, mdp, node_id)
         backpropagate_d(tree, node_id, res)
         return res
@@ -171,12 +200,27 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
 end
 
 function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
-    if tree.c_visits == 0
-        # add expand next d nodes
+    if tree.c_visits[node_id] == 0
+        # add expand next d nodes, check for duplicates
+        (state, action) = tree.state_actions[node_id]
+        distr = transition(mdp, state, action)
+
+        # THIS IS A MESS
+        for (next_state, prob) in weighted_iterator(distr)
+            if !haskey(tree.d_node_ids, next_state) # if decision node doesnt exist yet
+                add_decision_node(tree, next_state)
+                next_d_id = get_decision_id(tree, next_state)
+                tree.c_children[node_id][next_d_id] = prob
+            else    # if decision node exists in the tree already
+                next_d_id = get_decision_id(tree, next_state)
+                if !haskey(tree.c_children[node_id], next_d_id) # if not in the nodes children already
+                    tree.c_children[node_id][next_d_id] = prob
+                end
+            end
+        end
     end
 
-    outcomes = get_next_states(tree, node_id)
-
+    outcomes = tree.c_children[node_id]
     # select outcome based on probability
     next_state_id = select_outcome(outcomes)
 
@@ -185,7 +229,7 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
     return res
 end
 
-function base_thts(mdp::MDP, initial_state::S, max_iters::Int; tree::THTSTree)
+function base_thts(mdp::MDP, initial_state::S, max_iters::Int)
     tree = THTSTree()
     add_decision_node(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 0 tho
