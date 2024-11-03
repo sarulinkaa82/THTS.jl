@@ -59,7 +59,7 @@ function add_chance_node(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
         tree.c_node_ids[state_action] = action_id
         push!(tree.state_actions, state_action)
         push!(tree.c_visits, 0)
-        push!(tree.c_values, 0)
+        push!(tree.c_qvalues, 0)
         push!(tree.c_children, Dict{Int, Float64}())
     end
 end
@@ -83,38 +83,64 @@ function get_chance_id(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
 end
 
 
-function add_transition(tree::THTSTree{S, A}, state::S, action::A, next_state::S, probability::Float64) where {S, A}
-    state_id = get_decision_id(tree, state)
-    next_state_id = get_decision_id(tree, next_state)
-    action_id = get_chance_id(tree, state, action)
+# function add_transition(tree::THTSTree{S, A}, state::S, action::A, next_state::S, probability::Float64) where {S, A}
+#     state_id = get_decision_id(tree, state)
+#     next_state_id = get_decision_id(tree, next_state)
+#     action_id = get_chance_id(tree, state, action)
 
-    # link chance node as a child to decision node
-    if !(action_id in tree.d_children[state_id])
-        push!(tree.d_children[state_id], action_id)
-    end
+#     # link chance node as a child to decision node
+#     if !(action_id in tree.d_children[state_id])
+#         push!(tree.d_children[state_id], action_id)
+#     end
 
-    # link next_state decision node to chance node
-    tree.c_children[action_id][next_state_id] = probability
-end
+#     # link next_state decision node to chance node
+#     tree.c_children[action_id][next_state_id] = probability
+# end
 
 
 
 ##################### THTS #####################
 
+function init_heuristic(mdp::MDP)
+    return 0
+end
+
 """
 Selects best action according to chosen criteria\n
 Returns chance_id::Int of a chance node
 """
-function select_chance_node(tree::THTSTree{S, A}, node_id::Int)
-    nothing
+function select_chance_node(tree::THTSTree{S, A}, node_id::Int, exploration_bias::Float64) where {S, A}
+
+    children_ids = tree.d_children[node_id]
+    best_val = -Inf
+    best_child = nothing
+
+    Ck_nd = tree.d_visits[node_id]
+
+    for child_id in children_ids
+        Ck_nc = tree.c_visits[child_id]
+        Qk_nc = tree.c_qvalues[child_id]
+        if Ck_nc == 0
+            ucb1_val = Inf
+        else
+            ucb1_val = exploration_bias * sqrt(log(Ck_nd)/Ck_nc) + Qk_nc
+        end
+
+        if ucb1_val > best_val
+            best_val = ucb1_val
+            best_child = child_id
+        end
+    end
+
+    return best_child
 end
 
 """
 Selects outcoming next state base on the probability of the outcomes
-Return decision_id::Int of the next decision node
+Returns decision_id::Int of the next decision node
 """
-function select_outcome(outcomes::Dict{S, Float64})
-    next_nodes = Vectpr{Int}()
+function select_outcome(outcomes::Dict{S, Float64}) where {S, A}
+    next_nodes = Vector{Int}()
     weights = Vector{Float64}()
     for (decision_node_id, prob) in outcomes
         push!(next_nodes, decision_node_id)
@@ -122,7 +148,7 @@ function select_outcome(outcomes::Dict{S, Float64})
     end
 
     w = Weights(weights)
-    next_state_id = sample(next_states, w)
+    next_state_id = sample(next_nodes, w)
     # println(next_state_id)
     return next_state_id
 end
@@ -130,32 +156,24 @@ end
 """
 Backpropagates the result into the chance node
 """
-function backpropagate_c(tree::THTSTree{S, A}, node_id::Int, result::Float64)
-    nothing
+function backpropagate_c(tree::THTSTree{S, A}, node_id::Int, result::Float64) where {S, A}
+    tree.c_visits[node_id] += 1
 end
 
 """
 Backpropagates the result into the decision node
 """
-function backpropagate_d(tree::THTSTree{S, A}, node_id::Int, result::Float64)
-    nothing
+function backpropagate_d(tree::THTSTree{S, A}, node_id::Int, result::Float64) where {S, A}
+    tree.d_visits[node_id] += 1
 end
 
-
-"""
-Runs simulation from the decision node into a terminal state\n
-Returns result::Float64
-"""
-function simulate(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
-    nothing
-end
 
 
 """
 Chooses greedy action for a state of the decision node\n
 Returns action::A
 """
-function greedy_action(tree::THTSTree{S, A}, node_id)
+function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
     children_c_nodes = tree.d_children[node_id]
     
     max_q = -Inf
@@ -173,10 +191,20 @@ end
 
 
 
-function visit_d_node(tree::THTSTree{S, A}, node_id::Int) end
-function visit_c_node(tree::THTSTree{S, A}, node_id::Int) end
+function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
+function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 
-function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
+function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_bias::Float64) where {S, A}
+    state = tree.states[node_id]
+    println("state: ", node_id)
+    if isterminal(mdp, state)
+        println("REACHED TERMINAL")
+        acts = actions(mdp, state)
+        res = reward(mdp, state, acts[1])
+        println(res)
+        return Float64(res)
+    end
+
     if tree.d_visits[node_id] == 0
         # expand the children
         state = tree.states[node_id]
@@ -185,23 +213,22 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
         for a in acts # create chance node, add it to d_nodes children
             add_chance_node(tree, state, a)
             chance_id = get_chance_id(tree, state, a)
+            tree.c_qvalues[chance_id] = init_heuristic(mdp)
             push!(tree.d_children[node_id], chance_id)
         end
-
-        res = simulate(tree, mdp, node_id)
-        backpropagate_d(tree, node_id, res)
-        return res
     end
 
-    chance_node_id = select_chance_node(tree, node_id)
-    res = visit_c_node(tree, mdp, chance_node_id)
+    chance_node_id = select_chance_node(tree, node_id, exploration_bias)
+    res = visit_c_node(tree, mdp, chance_node_id, exploration_bias)
+    println("res_d", res)
     backpropagate_d(tree, node_id, res)
     return res
 end
 
-function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
+function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_bias::Float64) where {S, A}
+    println("chance_node: ", tree.state_actions[node_id])
     if tree.c_visits[node_id] == 0
-        # add expand next d nodes, check for duplicates
+        # expand next d nodes, check for duplicates
         (state, action) = tree.state_actions[node_id]
         distr = transition(mdp, state, action)
 
@@ -210,12 +237,13 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
             if !haskey(tree.d_node_ids, next_state) # if decision node doesnt exist yet
                 add_decision_node(tree, next_state)
                 next_d_id = get_decision_id(tree, next_state)
+                tree.d_values[next_d_id] = init_heuristic(mdp)
                 tree.c_children[node_id][next_d_id] = prob
             else    # if decision node exists in the tree already
                 next_d_id = get_decision_id(tree, next_state)
-                if !haskey(tree.c_children[node_id], next_d_id) # if not in the nodes children already
-                    tree.c_children[node_id][next_d_id] = prob
-                end
+                # if !haskey(tree.c_children[node_id], next_d_id) # if not in the nodes children already
+                tree.c_children[node_id][next_d_id] = prob
+                # end
             end
         end
     end
@@ -224,19 +252,26 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int)
     # select outcome based on probability
     next_state_id = select_outcome(outcomes)
 
-    res = visit_d_node(tree, next_state_id)
+    println("Here")
+    println("ns: ", next_state_id)
+    res = visit_d_node(tree, mdp, next_state_id, exploration_bias)
+    println("res:", res)
     backpropagate_c(tree, node_id, res)
     return res
 end
 
-function base_thts(mdp::MDP, initial_state::S, max_iters::Int)
-    tree = THTSTree()
+function base_thts(mdp::MDP, initial_state::S, max_iters::Int, exploration_bias::Float64) where {S, A}
+    a = actions(mdp, initial_state)[1]
+    tree = THTSTree{typeof(initial_state), typeof(a)}()
     add_decision_node(tree, initial_state)
-    root_id = get_decision_id(tree, initial_state) # should be 0 tho
+    root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     for iter in 1:max_iters
-        visit_d_node(mdp, tree, root_id)
+        visit_d_node(tree, mdp, root_id, exploration_bias)
     end
 
-    return greedy_action(tree, root_id)
+    # return greedy_action(tree, root_id)
+    return tree
 end
+
+
