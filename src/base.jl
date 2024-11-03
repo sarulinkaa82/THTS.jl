@@ -168,6 +168,44 @@ function backpropagate_d(tree::THTSTree{S, A}, node_id::Int, result::Float64) wh
 end
 
 
+"""
+Uses Max-Monte-Carlo backup to backup a decision node.
+"""
+function MaxUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, result::Float64) where {S, A}
+    if isterminal(mdp, tree.states[node_id])
+        new_v = 0
+    else
+        max_q = -Inf
+        for child_id in tree.d_children[node_id]
+            if tree.c_qvalues[child_id] > max_q
+                max_q = tree.c_qvalues[child_id]
+            end
+        end
+        new_v = max_q
+    end
+    tree.d_values[node_id] = new_v
+    tree.d_visits[node_id] += 1
+end
+
+"""
+Uses Max-Monte-Carlo backup to backup a chance node.
+"""
+function MaxUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, result::Float64) where {S, A}
+    (state, action) = tree.state_actions[node_id]
+    R_nc = reward(mdp, state, action)
+
+    sum = 0
+    for (child_id, prob) in tree.c_children[node_id]
+        sum += tree.d_visits[child_id] * tree.d_values[child_id]
+    end
+
+    new_q = R_nc + sum / tree.c_visits[node_id]
+
+    tree.c_qvalues[node_id] = new_q
+    tree.c_visits[node_id] += 1
+end
+
+
 
 """
 Chooses greedy action for a state of the decision node\n
