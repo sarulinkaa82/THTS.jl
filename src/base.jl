@@ -139,7 +139,7 @@ end
 Selects outcoming next state base on the probability of the outcomes
 Returns decision_id::Int of the next decision node
 """
-function select_outcome(outcomes::Dict{S, Float64}) where {S, A}
+function select_outcome(outcomes::Dict{Int, Float64})
     next_nodes = Vector{Int}()
     weights = Vector{Float64}()
     for (decision_node_id, prob) in outcomes
@@ -310,6 +310,57 @@ function base_thts(mdp::MDP, initial_state::S, max_iters::Int, exploration_bias:
 
     # return greedy_action(tree, root_id)
     return tree
+end
+
+
+mutable struct THTSSolver <: Solver
+    exploration_constant::Float64
+    iterations::Int
+    verbose::Bool 
+
+    # Default constructor
+    function THTSSolver(exploration_constant;
+        iterations::Int = 10,
+        verbose::Bool = false)    
+
+        return new(exploration_constant, iterations, verbose)
+    end
+end
+
+function sample_next_state(mdp::MDP, state::S, action::A) where {S, A}
+    distr = transition(mdp, state, action)
+    
+    nest_states = Vector{S}()
+    weights = Vector{Float64}()
+    for (ns, prob) in weighted_iterator(distr)
+        push!(nest_states, ns)
+        push!(weights, Float64(prob))
+    end
+
+    w = Weights(weights)
+    next_state = sample(nest_states, w)
+    # println(next_state_id)
+    return next_state
+
+end
+
+
+function solve(solver::THTSSolver, mdp::MDP, kwargs...)
+    path = []
+
+    state = get_initial_state(mdp)
+    while !isterminal(mdp, state)
+        best_action = base_thts(mdp, state, solver.iterations, solver.exploration_constant)
+        push!(path, (state, best_action))
+        state = sample_next_state(mdp, state, best_action)
+    end
+
+    return path
+end
+
+function get_initial_state(mdp::MDP)
+    all_s = states(mdp)
+    return all_s[1]
 end
 
 
