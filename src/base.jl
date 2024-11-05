@@ -3,6 +3,7 @@ using POMDPs
 using POMDPLinter
 using POMDPTools
 using StatsBase
+using FiniteHorizonPOMDPs
 
 
 
@@ -83,25 +84,10 @@ function get_chance_id(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
 end
 
 
-# function add_transition(tree::THTSTree{S, A}, state::S, action::A, next_state::S, probability::Float64) where {S, A}
-#     state_id = get_decision_id(tree, state)
-#     next_state_id = get_decision_id(tree, next_state)
-#     action_id = get_chance_id(tree, state, action)
-
-#     # link chance node as a child to decision node
-#     if !(action_id in tree.d_children[state_id])
-#         push!(tree.d_children[state_id], action_id)
-#     end
-
-#     # link next_state decision node to chance node
-#     tree.c_children[action_id][next_state_id] = probability
-# end
-
-
 
 ##################### THTS #####################
 
-function init_heuristic(mdp::MDP)
+function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     return 0
 end
 
@@ -112,6 +98,7 @@ Returns chance_id::Int of a chance node
 function select_chance_node(tree::THTSTree{S, A}, node_id::Int, exploration_bias::Float64) where {S, A}
 
     children_ids = tree.d_children[node_id]
+    # println("chance nodes: ", children_ids)
     best_val = -Inf
     best_child = nothing
 
@@ -120,12 +107,14 @@ function select_chance_node(tree::THTSTree{S, A}, node_id::Int, exploration_bias
     for child_id in children_ids
         Ck_nc = tree.c_visits[child_id]
         Qk_nc = tree.c_qvalues[child_id]
+        # println("Qk_nc: ", Qk_nc)
         if Ck_nc == 0
             ucb1_val = Inf
         else
             ucb1_val = exploration_bias * sqrt(log(Ck_nd)/Ck_nc) + Qk_nc
         end
 
+        # println("ucb1: ", ucb1_val)
         if ucb1_val > best_val
             best_val = ucb1_val
             best_child = child_id
@@ -171,7 +160,8 @@ end
 """
 Uses Max-Monte-Carlo backup to backup a decision node.
 """
-function MaxUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, result::Float64) where {S, A}
+function MaxUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, result::Float64) where {S, A}
+    tree.d_visits[node_id] += 1
     if isterminal(mdp, tree.states[node_id])
         new_v = 0
     else
@@ -184,13 +174,14 @@ function MaxUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, re
         new_v = max_q
     end
     tree.d_values[node_id] = new_v
-    tree.d_visits[node_id] += 1
+    # println("backpropagating ", new_v, " into d", node_id)
 end
 
 """
 Uses Max-Monte-Carlo backup to backup a chance node.
 """
-function MaxUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, result::Float64) where {S, A}
+function MaxUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, result::Float64) where {S, A}
+    tree.c_visits[node_id] += 1
     (state, action) = tree.state_actions[node_id]
     R_nc = reward(mdp, state, action)
 
@@ -202,7 +193,8 @@ function MaxUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, re
     new_q = R_nc + sum / tree.c_visits[node_id]
 
     tree.c_qvalues[node_id] = new_q
-    tree.c_visits[node_id] += 1
+    # println("backpropagating ", new_q, " into c", node_id)
+
 end
 
 
@@ -232,14 +224,14 @@ end
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 
-function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_bias::Float64) where {S, A}
+function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, exploration_bias::Float64) where {S, A}
     state = tree.states[node_id]
-    println("state: ", node_id)
+    # println("state: ", state)
     if isterminal(mdp, state)
-        println("REACHED TERMINAL")
+        # println("REACHED TERMINAL")
         acts = actions(mdp, state)
         res = reward(mdp, state, acts[1])
-        println(res)
+        # println(res)
         return Float64(res)
     end
 
@@ -257,14 +249,16 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_
     end
 
     chance_node_id = select_chance_node(tree, node_id, exploration_bias)
+    # println("chance node:", chance_node_id)
     res = visit_c_node(tree, mdp, chance_node_id, exploration_bias)
-    println("res_d", res)
-    backpropagate_d(tree, node_id, res)
+    # println("res_d", res)
+    # backpropagate_d(tree, node_id, res)
+    MaxUCT_backpropagate_d(tree, mdp, node_id, res)
     return res
 end
 
-function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_bias::Float64) where {S, A}
-    println("chance_node: ", tree.state_actions[node_id])
+function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, exploration_bias::Float64) where {S, A}
+    # println("chance_node: ", tree.state_actions[node_id])
     if tree.c_visits[node_id] == 0
         # expand next d nodes, check for duplicates
         (state, action) = tree.state_actions[node_id]
@@ -290,26 +284,28 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::MDP, node_id::Int, exploration_
     # select outcome based on probability
     next_state_id = select_outcome(outcomes)
 
-    println("Here")
-    println("ns: ", next_state_id)
+    # println("Here")
+    # println("ns: ", next_state_id)
     res = visit_d_node(tree, mdp, next_state_id, exploration_bias)
-    println("res:", res)
-    backpropagate_c(tree, node_id, res)
+    # println("res:", res)
+    # backpropagate_c(tree, node_id, res)
+    MaxUCT_backpropagate_c(tree, mdp, node_id, res)
     return res
 end
 
-function base_thts(mdp::MDP, initial_state::S, max_iters::Int, exploration_bias::Float64) where {S, A}
-    a = actions(mdp, initial_state)[1]
+function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, initial_state::S, max_iters::Int, exploration_bias::Float64) where {S, A}
+    # a = actions(mdp, initial_state)[1]
     tree = THTSTree{typeof(initial_state), typeof(a)}()
     add_decision_node(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     for iter in 1:max_iters
         visit_d_node(tree, mdp, root_id, exploration_bias)
+        # println(iter," iter ended")
     end
 
-    # return greedy_action(tree, root_id)
-    return tree
+    return greedy_action(tree, root_id)
+    # return tree
 end
 
 
@@ -327,7 +323,7 @@ mutable struct THTSSolver <: Solver
     end
 end
 
-function sample_next_state(mdp::MDP, state::S, action::A) where {S, A}
+function get_next_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, state::S, action::A) where {S, A}
     distr = transition(mdp, state, action)
     
     nest_states = Vector{S}()
@@ -345,22 +341,31 @@ function sample_next_state(mdp::MDP, state::S, action::A) where {S, A}
 end
 
 
-function solve(solver::THTSSolver, mdp::MDP, kwargs...)
+function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
+    # get initial state
+    # in a loop do:
+    #  run thts to get greedy action
+    #  apply action
+    # if terminal state reached, break and return
+
     path = []
 
     state = get_initial_state(mdp)
     while !isterminal(mdp, state)
         best_action = base_thts(mdp, state, solver.iterations, solver.exploration_constant)
         push!(path, (state, best_action))
-        state = sample_next_state(mdp, state, best_action)
+        state = get_next_state(mdp, state, best_action)
     end
+
+    push!(path, (state))
 
     return path
 end
 
-function get_initial_state(mdp::MDP)
-    all_s = states(mdp)
-    return all_s[1]
-end
+function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
+    all_s = stage_states(mdp, 1)
+    all_states = collect(all_s)
 
+    return all_states[1]
+end
 

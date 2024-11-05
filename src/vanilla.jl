@@ -225,15 +225,5 @@ function backpropagate(mdp::MDP, node::StateNode, sim_result::Float64, q::Dict{A
 end
 
 
-function print_tree(node::StateNode, depth::Int = 0)
-    println("  "^depth * "State: ", node.state, ", Visits: ", node.visits)
-    
-    for child in node.children
-        print_tree(child, depth + 1)
-    end
-end
-
-
-
 
 
