@@ -6,9 +6,6 @@ using StatsBase
 using FiniteHorizonPOMDPs
 using Logging
 
-
-
-
 mutable struct THTSTree{S,A}
     d_node_ids::Dict{S, Int}
     c_node_ids::Dict{Tuple{S, A}, Int}
@@ -157,6 +154,44 @@ function backpropagate_d(tree::THTSTree{S, A}, node_id::Int, result::Float64) wh
     tree.d_visits[node_id] += 1
 end
 
+"""
+Uses Partial Bellman backup to backup a decision node
+"""
+function DPUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, result::Float64) where {S, A}
+    tree.d_visits[node_id] += 1
+    if isterminal(mdp, tree.states[node_id])
+        new_v = 0
+    else
+        max_q = -Inf
+        for child_id in tree.d_children[node_id]
+            if tree.c_qvalues[child_id] > max_q
+                max_q = tree.c_qvalues[child_id]
+            end
+        end
+        new_v = max_q
+    end
+    tree.d_values[node_id] = new_v
+end
+
+function DPUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, result::Float64) where {S, A}
+    tree.c_visits[node_id] += 1
+    (state, action) = tree.state_actions[node_id]
+    R_nc = reward(mdp, state, action)
+
+    sum = 0
+    Pk_nc = 0
+    for (child_id, prob) in tree.c_children[node_id]
+        sum += prob * tree.d_values[child_id]
+        Pk_nc += prob
+    end
+
+    new_q =  R_nc + sum / Pk_nc
+    
+    tree.c_qvalues[node_id] = new_q
+end
+
+
+
 
 """
 Uses Max-Monte-Carlo backup to backup a decision node.
@@ -254,6 +289,7 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
     res = visit_c_node(tree, mdp, chance_node_id, exploration_bias)
     # println("res_d", res)
     # backpropagate_d(tree, node_id, res)
+    # DPUCT_backpropagate_d(tree, mdp, node_id, res)
     MaxUCT_backpropagate_d(tree, mdp, node_id, res)
     return res
 end
@@ -290,6 +326,7 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
     res = visit_d_node(tree, mdp, next_state_id, exploration_bias)
     # println("res:", res)
     # backpropagate_c(tree, node_id, res)
+    # DPUCT_backpropagate_c(tree, mdp, node_id, res)
     MaxUCT_backpropagate_c(tree, mdp, node_id, res)
     return res
 end
@@ -382,7 +419,7 @@ function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapp
         path = get_path(solver, mdo, kwargs)
     end
 
-    println(path)
+    return path
     
 end
 
@@ -409,6 +446,5 @@ function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     all_s = stage_states(mdp, 1)
     all_states = collect(all_s)
 
-    return all_states[1]
+    return all_states[3]
 end
-
