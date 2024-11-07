@@ -4,6 +4,7 @@ using POMDPLinter
 using POMDPTools
 using StatsBase
 using FiniteHorizonPOMDPs
+using Logging
 
 
 
@@ -293,14 +294,20 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
     return res
 end
 
-function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, initial_state::S, max_iters::Int, exploration_bias::Float64) where {S, A}
-    # a = actions(mdp, initial_state)[1]
+function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, initial_state::S, max_iters::Int, exploration_bias::Float64) where {S}
+    a = actions(mdp, initial_state)[1]
     tree = THTSTree{typeof(initial_state), typeof(a)}()
     add_decision_node(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     for iter in 1:max_iters
         visit_d_node(tree, mdp, root_id, exploration_bias)
+        # if iter % 10 == 0
+            v_table = make_v_table(tree)
+            q_table = make_q_table(tree)
+            @debug "V_TABLE for iter $iter: $v_table"
+            @debug "Q_TABLE for iter $iter: $q_table"
+        # end
         # println(iter," iter ended")
     end
 
@@ -308,6 +315,23 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, initial_stat
     # return tree
 end
 
+
+function make_v_table(tree::THTSTree)
+    v_table = Dict()
+    for (state, node_id) in tree.d_node_ids
+        v_table[state] = tree.d_values[node_id]
+    end
+    return v_table
+end
+
+function make_q_table(tree::THTSTree)
+    q_table = Dict()
+    for (state, node_id) in tree.c_node_ids
+        q_table[state] = tree.c_qvalues[node_id]
+    end
+    return q_table
+
+end
 
 mutable struct THTSSolver <: Solver
     exploration_constant::Float64
@@ -342,17 +366,35 @@ end
 
 
 function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
-    # get initial state
-    # in a loop do:
-    #  run thts to get greedy action
-    #  apply action
-    # if terminal state reached, break and return
 
     path = []
 
+    if solver.verbose
+        io = open("thts_log.txt", "w")
+        try
+            global_logger(SimpleLogger(io, Logging.Debug))
+            # Call your functions that involve logging here
+            path = get_path(solver, mdp, kwargs)
+        finally
+            close(io)  # Ensure the file is closed after logging completes
+        end
+    else
+        path = get_path(solver, mdo, kwargs)
+    end
+
+    println(path)
+    
+end
+
+function get_path(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
+    path = []
     state = get_initial_state(mdp)
+
+    
     while !isterminal(mdp, state)
+        @info "STARTING THTS with initial state $state"
         best_action = base_thts(mdp, state, solver.iterations, solver.exploration_constant)
+        @info "BEST ACTION for state $state chosen as $best_action"
         push!(path, (state, best_action))
         state = get_next_state(mdp, state, best_action)
     end
@@ -360,6 +402,7 @@ function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapp
     push!(path, (state))
 
     return path
+
 end
 
 function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
