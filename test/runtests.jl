@@ -11,14 +11,14 @@ using Test
     all_states = collect(all_s)
 
     state_test1 = all_states[1]
-    act1 = base_thts(fhm, state_test1, 100, 1.4)
+    act1 = base_thts(fhm, solver, state_test1)
     @test act1 == "a00"
 
     state_test2 = all_states[3]
-    act2 = base_thts(fhm, state_test2, 100, 1.4)
+    act2 = base_thts(fhm, solver, state_test2)
     @test act2 == "a20"
 
     state_test3 = all_states[5]
-    act3 = base_thts(fhm, state_test3, 100, 1.4)
+    act3 = base_thts(fhm, solver, state_test3)
     @test act3 == "a41"
 end
