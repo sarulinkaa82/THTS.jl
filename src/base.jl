@@ -147,21 +147,14 @@ end
 """
 Backpropagates the result into the chance node
 """
-function backpropagate_c(tree::THTSTree{S, A}, node_id::Int, result::Float64) where {S, A}
+function backpropagate_c(tree::THTSTree{S, A}, mdp::MDP, node_id::Int) where {S, A}
     tree.c_visits[node_id] += 1
 end
 
 """
 Backpropagates the result into the decision node
 """
-function backpropagate_d(tree::THTSTree{S, A}, node_id::Int, result::Float64) where {S, A}
-    tree.d_visits[node_id] += 1
-end
-
-"""
-Uses Partial Bellman backup to backup a decision node
-"""
-function DPUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int) where {S, A}
+function backpropagate_d(tree::THTSTree{S, A}, mdp::MDP, node_id::Int) where {S, A}
     tree.d_visits[node_id] += 1
     if isterminal(mdp, tree.states[node_id])
         new_v = 0
@@ -176,6 +169,7 @@ function DPUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.Fi
     end
     tree.d_values[node_id] = new_v
 end
+
 
 function DPUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int) where {S, A}
     tree.c_visits[node_id] += 1
@@ -197,25 +191,6 @@ end
 
 
 
-"""
-Uses Max-Monte-Carlo backup to backup a decision node.
-"""
-function MaxUCT_backpropagate_d(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int) where {S, A}
-    tree.d_visits[node_id] += 1
-    if isterminal(mdp, tree.states[node_id])
-        new_v = 0
-    else
-        max_q = -Inf
-        for child_id in tree.d_children[node_id]
-            if tree.c_qvalues[child_id] > max_q
-                max_q = tree.c_qvalues[child_id]
-            end
-        end
-        new_v = max_q
-    end
-    tree.d_values[node_id] = new_v
-    # println("backpropagating ", new_v, " into d", node_id)
-end
 
 """
 Uses Max-Monte-Carlo backup to backup a chance node.
@@ -233,8 +208,6 @@ function MaxUCT_backpropagate_c(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.F
     new_q = R_nc + sum / tree.c_visits[node_id]
 
     tree.c_qvalues[node_id] = new_q
-    # println("backpropagating ", new_q, " into c", node_id)
-
 end
 
 
@@ -264,7 +237,7 @@ end
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 
-function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, exploration_bias::Float64) where {S, A}
+function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}
     state = tree.states[node_id]
     if isterminal(mdp, state)
         return
@@ -282,18 +255,20 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
             push!(tree.d_children[node_id], chance_id)
         end
 
-        DPUCT_backpropagate_d(tree, mdp, node_id)
-        return
+        if solver.enable_UCTStar
+            backpropagate_d(tree, mdp, node_id)
+            return
+        end
     end
 
-    chance_node_id = select_chance_node(tree, node_id, exploration_bias)
-    visit_c_node(tree, mdp, chance_node_id, exploration_bias)
-    DPUCT_backpropagate_d(tree, mdp, node_id)
+    chance_node_id = select_chance_node(tree, node_id, solver.exploration_constant)
+    visit_c_node(tree, mdp, solver, chance_node_id)
+    backpropagate_d(tree, mdp, node_id)
 
     return
 end
 
-function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int, exploration_bias::Float64) where {S, A}
+function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}
     if tree.c_visits[node_id] == 0
         # expand next d nodes, check for duplicates
         (state, action) = tree.state_actions[node_id]
@@ -311,16 +286,19 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
                 tree.c_children[node_id][next_d_id] = prob
             end
         end
-        DPUCT_backpropagate_c(tree, mdp, node_id)
-        return
+        if solver.enable_UCTStar
+            solver.backup_function(tree, mdp, node_id)
+            return
+        end
     end
 
     outcomes = tree.c_children[node_id]
     # select outcome based on probability
     next_state_id = select_outcome(outcomes)
 
-    visit_d_node(tree, mdp, next_state_id, exploration_bias)
-    DPUCT_backpropagate_c(tree, mdp, node_id)
+    visit_d_node(tree, mdp, solver, next_state_id)
+    solver.backup_function(tree, mdp, node_id)
+    # DPUCT_backpropagate_c(tree, mdp, node_id)
     return
 end
 
@@ -331,12 +309,12 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     for iter in 1:solver.iterations
-        visit_d_node(tree, mdp, root_id, solver.exploration_constant)
+        visit_d_node(tree, mdp, solver, root_id)
         if solver.verbose && iter % (solver.iterations ÷ 5) == 0
             v_table = make_v_table(tree)
             q_table = make_q_table(tree)
-            @debug "V_TABLE for iter $iter: $v_table"
-            @debug "Q_TABLE for iter $iter: $q_table"
+            solver.verbose && @debug "V_TABLE for iter $iter: $v_table"
+            solver.verbose && @debug "Q_TABLE for iter $iter: $q_table"
         end
     end
 
@@ -365,13 +343,18 @@ mutable struct THTSSolver <: Solver
     exploration_constant::Float64
     iterations::Int
     verbose::Bool 
+    backup_function::Function
+    enable_UCTStar::Bool
 
     # Default constructor
     function THTSSolver(exploration_constant;
         iterations::Int = 10,
-        verbose::Bool = false)    
+        verbose::Bool = false,
+        backup_function::Function = backpropagate_c,
+        enable_UCTStar::Bool = false
+        )    
 
-        return new(exploration_constant, iterations, verbose)
+        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
     end
 end
 
@@ -394,25 +377,44 @@ end
 
 
 
+# function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
+#     path = []
+
+#     if solver.verbose
+#         io = open("thts_log.txt", "w")
+#         try
+#             global_logger(SimpleLogger(io, Logging.Debug))
+#             # Call your functions that involve logging here
+#             path = get_path(solver, mdp, kwargs)
+#         finally
+#             close(io) 
+#         end
+#     else
+#         path = get_path(solver, mdp, kwargs)
+#     end
+#     return path
+# end
+
+# function get_path(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
+#     path = []
+#     state = get_initial_state(mdp)
+
+    
+#     while !isterminal(mdp, state)
+#         solver.verbose && @info "STARTING THTS with initial state $state"
+#         best_action = base_thts(mdp, solver, state)
+#         solver.verbose && @info "BEST ACTION for state $state chosen as $best_action"
+#         push!(path, (state, best_action))
+#         state = get_next_state(mdp, state, best_action)
+#     end
+
+#     push!(path, (state))
+
+#     return path
+
+# end
+
 function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
-    path = []
-
-    if solver.verbose
-        io = open("thts_log.txt", "w")
-        try
-            global_logger(SimpleLogger(io, Logging.Debug))
-            # Call your functions that involve logging here
-            path = get_path(solver, mdp, kwargs)
-        finally
-            close(io) 
-        end
-    else
-        path = get_path(solver, mdp, kwargs)
-    end
-    return path
-end
-
-function get_path(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
     path = []
     state = get_initial_state(mdp)
 
@@ -428,8 +430,9 @@ function get_path(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWr
     push!(path, (state))
 
     return path
-
 end
+
+
 
 function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     all_s = stage_states(mdp, 1)
