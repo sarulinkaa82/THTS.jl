@@ -5,92 +5,31 @@ using POMDPTools
 using StatsBase
 using FiniteHorizonPOMDPs
 using Logging
-using Test
 
 
+# udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru
+mutable struct THTSSolver <: Solver
+    exploration_constant::Float64
+    iterations::Int
+    verbose::Bool 
+    backup_function::Function
+    enable_UCTStar::Bool
 
+    # Default constructor
+    function THTSSolver(exploration_constant;
+        iterations::Int = 10,
+        verbose::Bool = false,
+        backup_function::Function = backpropagate_c,
+        enable_UCTStar::Bool = false
+        )    
 
-mutable struct THTSTree{S,A}
-    d_node_ids::Dict{S, Int}
-    c_node_ids::Dict{Tuple{S, A}, Int}
-
-    # decision nodes data
-    states::Vector{S}
-    d_visits::Vector{Int}
-    d_values::Vector{Float64}
-    d_children::Vector{Vector{Int}}
-
-    # chance nodes data
-    state_actions::Vector{Tuple{S, A}}
-    c_visits::Vector{Int}
-    c_qvalues::Vector{Float64}
-    c_children::Vector{Dict{Int, Float64}}
-
-    # Constructor to initialize empty dictionaries and arrays
-    function THTSTree{S, A}() where  {S, A}
-        new(
-            Dict{S, Int}(),
-            Dict{Tuple{S, A}, Int}(),
-            S[],
-            Int[],
-            Float64[],
-            Vector{Vector{Int}}(),
-            Tuple{S, A}[],
-            Int[],
-            Float64[],
-            Vector{Dict{Int, Float64}}()
-        )
+        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
     end
 end
 
-
-function add_decision_node(tree::THTSTree{S, A}, state::S) where {S, A}
-    if !haskey(tree.d_node_ids, state)
-        state_id = length(tree.d_node_ids) + 1
-        tree.d_node_ids[state] = state_id
-        push!(tree.states, state)
-        push!(tree.d_visits, 0)
-        push!(tree.d_values, 0)
-        push!(tree.d_children, Int[])
-    end
-end
-
-function add_chance_node(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
-    state_action = (state, action)
-    if !haskey(tree.c_node_ids, state_action)
-        action_id = length(tree.c_node_ids) + 1
-        tree.c_node_ids[state_action] = action_id
-        push!(tree.state_actions, state_action)
-        push!(tree.c_visits, 0)
-        push!(tree.c_qvalues, 0)
-        push!(tree.c_children, Dict{Int, Float64}())
-    end
-end
-
-function get_decision_id(tree::THTSTree{S, A}, state::S) where {S, A}
-    if !haskey(tree.d_node_ids, state)
-        add_decision_node(tree, state)
-    end
-
-    return tree.d_node_ids[state]
-end
-
-
-function get_chance_id(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
-    state_action = (state, action)
-    if !haskey(tree.c_node_ids, state_action)
-        add_chance_node(tree, state, action)
-    end
-
-    return tree.c_node_ids[state_action]
-end
-
-
-
-##################### THTS #####################
 
 function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
-    return 0
+    return rand(-5:5)
 end
 
 """
@@ -190,8 +129,6 @@ end
 
 
 
-
-
 """
 Uses Max-Monte-Carlo backup to backup a chance node.
 """
@@ -231,7 +168,6 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
 
     return max_act
 end
-
 
 
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
@@ -303,60 +239,35 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
 end
 
 function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, initial_state::S) where {S}
+    # Initialize tree and choose the first node
+    iteration_data = []
     a = actions(mdp, initial_state)[1]
     tree = THTSTree{typeof(initial_state), typeof(a)}()
     add_decision_node(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
-    for iter in 1:solver.iterations
-        visit_d_node(tree, mdp, solver, root_id)
-        if solver.verbose && iter % (solver.iterations ÷ 5) == 0
-            v_table = make_v_table(tree)
-            q_table = make_q_table(tree)
-            solver.verbose && @debug "V_TABLE for iter $iter: $v_table"
-            solver.verbose && @debug "Q_TABLE for iter $iter: $q_table"
+    if solver.verbose
+        open("iteration_values.csv", "w") do io
+            CSV.write(io, DataFrame(Iteration = Int[], Value = Float64[]))
         end
     end
 
-    return greedy_action(tree, root_id)
-end
-
-
-function make_v_table(tree::THTSTree)
-    v_table = Dict()
-    for (state, node_id) in tree.d_node_ids
-        v_table[state] = tree.d_values[node_id]
+    # Run thts algorithm
+    for iter in 1:solver.iterations
+        visit_d_node(tree, mdp, solver, root_id)
+        if solver.verbose && iter % (solver.iterations ÷ 1000) == 0
+            open("iteration_values.csv", "a") do io
+                CSV.write(io, DataFrame(Iteration = [iter], Value = [tree.d_values[1]]), append=true)
+            end
+        end
     end
-    return v_table
+    
+    return tree
+    # return greedy_action(tree, root_id)
 end
 
-function make_q_table(tree::THTSTree)
-    q_table = Dict()
-    for (state, node_id) in tree.c_node_ids
-        q_table[state] = tree.c_qvalues[node_id]
-    end
-    return q_table
 
-end
 
-mutable struct THTSSolver <: Solver
-    exploration_constant::Float64
-    iterations::Int
-    verbose::Bool 
-    backup_function::Function
-    enable_UCTStar::Bool
-
-    # Default constructor
-    function THTSSolver(exploration_constant;
-        iterations::Int = 10,
-        verbose::Bool = false,
-        backup_function::Function = backpropagate_c,
-        enable_UCTStar::Bool = false
-        )    
-
-        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
-    end
-end
 
 function get_next_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, state::S, action::A) where {S, A}
     distr = transition(mdp, state, action)
@@ -374,45 +285,6 @@ function get_next_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, state::
     return next_state
 
 end
-
-
-
-# function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
-#     path = []
-
-#     if solver.verbose
-#         io = open("thts_log.txt", "w")
-#         try
-#             global_logger(SimpleLogger(io, Logging.Debug))
-#             # Call your functions that involve logging here
-#             path = get_path(solver, mdp, kwargs)
-#         finally
-#             close(io) 
-#         end
-#     else
-#         path = get_path(solver, mdp, kwargs)
-#     end
-#     return path
-# end
-
-# function get_path(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
-#     path = []
-#     state = get_initial_state(mdp)
-
-    
-#     while !isterminal(mdp, state)
-#         solver.verbose && @info "STARTING THTS with initial state $state"
-#         best_action = base_thts(mdp, solver, state)
-#         solver.verbose && @info "BEST ACTION for state $state chosen as $best_action"
-#         push!(path, (state, best_action))
-#         state = get_next_state(mdp, state, best_action)
-#     end
-
-#     push!(path, (state))
-
-#     return path
-
-# end
 
 function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
     path = []
@@ -438,5 +310,6 @@ function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     all_s = stage_states(mdp, 1)
     all_states = collect(all_s)
 
-    return all_states[50]
+    return all_states[1]
 end
+
