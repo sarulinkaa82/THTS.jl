@@ -1,11 +1,27 @@
+using Revise
 using THTS
 using DataFrames
 using Plots
 using CSV
-using Random
+using FiniteHorizonPOMDPs
+
+include("MausamKolobov.jl")
+
+
+tree = THTSTree{String, String}()
+
+add_decision_node(tree, "s1")
+
+mdp = MausamKolobov()
+ss = ordered_states(fhm)
+is = ss[1]
+fhm = fixhorizon(mdp, 25)
+maxuctsolver = THTSSolver(6, backup_function = MaxUCT_backpropagate_c, iterations = 1000)
+
+res = base_thts(fhm, maxuctsolver, is)
+greedy_action(res, 1)
 
 ########## TESTING ##############
-include("MausamKolobov.jl")
 
 m = SimpleGridWorld()
 m = MausamKolobov()

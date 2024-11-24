@@ -1,35 +1,5 @@
-
-using POMDPs
-using POMDPLinter
-using POMDPTools
-using StatsBase
-using FiniteHorizonPOMDPs
-using Logging
-
-
-# udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru
-mutable struct THTSSolver <: Solver
-    exploration_constant::Float64
-    iterations::Int
-    verbose::Bool 
-    backup_function::Function
-    enable_UCTStar::Bool
-
-    # Default constructor
-    function THTSSolver(exploration_constant;
-        iterations::Int = 10,
-        verbose::Bool = false,
-        backup_function::Function = backpropagate_c,
-        enable_UCTStar::Bool = false
-        )    
-
-        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
-    end
-end
-
-
 function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
-    return rand(-5:5)
+    return 0
 end
 
 """
@@ -169,6 +139,27 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
     return max_act
 end
 
+# udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru?
+mutable struct THTSSolver <: Solver
+    exploration_constant::Float64
+    iterations::Int
+    verbose::Bool 
+    backup_function::Function
+    enable_UCTStar::Bool
+
+    # default constructor
+    function THTSSolver(exploration_constant;
+        iterations::Int = 10,
+        verbose::Bool = false,
+        backup_function::Function = backpropagate_c,
+        enable_UCTStar::Bool = false
+        )    
+
+        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
+    end
+end
+
+
 
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
@@ -176,6 +167,7 @@ function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}
     state = tree.states[node_id]
     if isterminal(mdp, state)
+        backpropagate_d(tree, mdp, node_id)
         return
     end
 
@@ -206,11 +198,9 @@ end
 
 function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}
     if tree.c_visits[node_id] == 0
-        # expand next d nodes, check for duplicates
         (state, action) = tree.state_actions[node_id]
         distr = transition(mdp, state, action)
 
-        # THIS IS A MESS
         for (next_state, prob) in weighted_iterator(distr)
             if !haskey(tree.d_node_ids, next_state) # if decision node doesnt exist yet
                 add_decision_node(tree, next_state)
@@ -232,9 +222,9 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
     # select outcome based on probability
     next_state_id = select_outcome(outcomes)
 
+
     visit_d_node(tree, mdp, solver, next_state_id)
     solver.backup_function(tree, mdp, node_id)
-    # DPUCT_backpropagate_c(tree, mdp, node_id)
     return
 end
 
@@ -250,22 +240,32 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
         open("iteration_values.csv", "w") do io
             CSV.write(io, DataFrame(Iteration = Int[], Value = Float64[]))
         end
+        open("delta_values.csv", "w") do io
+            CSV.write(io, DataFrame(Iteration = Int[], Prev_Value = Float64[], Value = Float64[], P_c1_v = Float64[], c1_v = Float64[], P_c2_v = Float64[], c2_v = Float64[], p_c1_vis = Int[], c1_vis = Int[], P_c2_vis = Int[], c2_vis = Int[]))
+        end
     end
 
     # Run thts algorithm
+    prev_v = 0
+    prev_t = tree
     for iter in 1:solver.iterations
         visit_d_node(tree, mdp, solver, root_id)
+        
         if solver.verbose && iter % (solver.iterations ÷ 1000) == 0
+            open("delta_values.csv", "a") do io
+                CSV.write(io, DataFrame(Iteration = [iter], Prev_Value = [prev_t.d_values[1]], Value = [tree.d_values[1]], P_c1_v = [prev_t.c_qvalues[1]], c1_v = [tree.c_qvalues[1]], P_c2_v = [prev_t.c_qvalues[2]], c2_v = [tree.c_qvalues[2]], p_c1_vis = [prev_t.c_visits[1]], c1_vis = [tree.c_visits[1]], P_c2_vis = [prev_t.c_visits[2]], c2_vis = [tree.c_visits[2]]), append=true)
+            end
+
             open("iteration_values.csv", "a") do io
                 CSV.write(io, DataFrame(Iteration = [iter], Value = [tree.d_values[1]]), append=true)
             end
         end
+        prev_t = deepcopy(tree)
     end
     
-    return tree
-    # return greedy_action(tree, root_id)
+    # return tree
+    return greedy_action(tree, root_id)
 end
-
 
 
 
@@ -281,14 +281,15 @@ function get_next_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, state::
 
     w = Weights(weights)
     next_state = sample(nest_states, w)
-    # println(next_state_id)
-    return next_state
+    r = reward(mdp, state, action, next_state)
+    return (next_state, r)
 
 end
 
 function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, kwargs...)
     path = []
     state = get_initial_state(mdp)
+    acc_reward = 0
 
     
     while !isterminal(mdp, state)
@@ -296,12 +297,14 @@ function solve(solver::THTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapp
         best_action = base_thts(mdp, solver, state)
         solver.verbose && @info "BEST ACTION for state $state chosen as $best_action"
         push!(path, (state, best_action))
-        state = get_next_state(mdp, state, best_action)
+        (state, r) = get_next_state(mdp, state, best_action)
+        acc_reward += r
     end
 
     push!(path, (state))
-
-    return path
+    
+    # println(path)
+    return acc_reward
 end
 
 
