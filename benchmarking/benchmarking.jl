@@ -9,15 +9,18 @@ using Printf
 include("MausamKolobov.jl")
 include("CustomDomains.jl")
 
-include("utils.jl")
+include("benchmark_utils.jl")
 
 mdp = MausamKolobov()
 mdp = fixhorizon(mdp, 25)
 
-
 # Measure average and median reward of MaxUCT, DPUCT, UCT* and MCTS
 avg_acc_reward(fhm, 100)
 
-
-benchmark_one_run(mdp, "Baseline - MausamKolobov domain")
+# Empty files storing benchmarling results 
 rewrite_benchmark_files()
+
+benchmark_partial_run(mdp, "Baseline - MausamKolobov domain")
+benchmark_complete_run(mdp, "Baseline - MausamKolobov domain")
+
+

@@ -4,6 +4,7 @@ using DataFrames
 using Plots
 using CSV
 using FiniteHorizonPOMDPs
+using Random
 
 include("MausamKolobov.jl")
 
@@ -120,3 +121,21 @@ function get_state_V(mdp::MDP, horizon::Int)
 end
 
 v = get_state_V(mdp, 25)
+
+
+include("CustomDomains.jl")
+sim = RolloutSimulator(max_steps=100, rng=MersenneTwister(7))
+
+mdp = SimpleGridWorld()
+mdp = MausamKolobov()
+mdp = fixhorizon(mdp, 25)
+
+d=20; n=100; c=10.
+@show d, n, c
+solver = MCTSSolver(depth=d, n_iterations=n, exploration_constant=c, rng=MersenneTwister(8))
+
+planner = MCTS.solve(solver, mdp)
+simulate(sim, mdp, planner)
+
+statetype(mdp)
+statetype(mdp)
