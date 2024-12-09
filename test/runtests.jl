@@ -1,11 +1,12 @@
 using THTS
 using Test
+using FiniteHorizonPOMDPs
 
 @testset "action choices" begin
     include("MausamKolobov.jl")
     m = MausamKolobov()
     fhm = fixhorizon(m, 15)
-    solver = THTSSolver(1.4, iterations = 100)
+    solver = THTSSolver(1.4, iterations = 100) # There should an option to seed the algorithm
     
     all_s = stage_states(fhm, 1)
     all_states = collect(all_s)
@@ -20,5 +21,5 @@ using Test
 
     state_test3 = all_states[5]
     act3 = base_thts(fhm, solver, state_test3)
-    @test act3 == "a41"
+    @test act3 == "a41" # Tenle test u me neprochazi
 end
