@@ -1,4 +1,4 @@
-function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
+function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper) # melo by to mit vic nez jeden argument? Na cem vsem muze zaviset init heuristic?
     return 0
 end
 
@@ -39,7 +39,7 @@ end
 Selects outcoming next state base on the probability of the outcomes
 Returns decision_id::Int of the next decision node
 """
-function select_outcome(outcomes::Dict{Int, Float64})
+function select_outcome(outcomes::Dict{Int, Float64}) # Tohle vypada neefektivne, po jednom budovat v kazde iteraci novy vektor pro samplovani...
     next_nodes = Vector{Int}()
     weights = Vector{Float64}()
     for (decision_node_id, prob) in outcomes
@@ -140,6 +140,7 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
 end
 
 # udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru?
+# Proc je to mutable? 
 mutable struct THTSSolver <: Solver
     exploration_constant::Float64
     iterations::Int
@@ -164,10 +165,10 @@ end
 function visit_d_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 function visit_c_node(tree::THTSTree{S, A}, node_id::Int) where {S, A} end
 
-function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}
+function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, node_id::Int) where {S, A}  # Kde se pouzivaji veze z FiniteHorizon? Neni omezeni na FHWrapper prilis omezujici?
     state = tree.states[node_id]
     if isterminal(mdp, state)
-        backpropagate_d(tree, mdp, node_id)
+        backpropagate_d(tree, mdp, node_id) # Jak pouzit jinou backprop funkci? imo by to mel byt parametr solveru a brat to z nej... Dobre je ze vsechny backprop maji stejnou signature
         return
     end
 
@@ -177,9 +178,9 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
         acts = actions(mdp, state)
 
         for a in acts # create chance node, add it to d_nodes children
-            add_chance_node(tree, state, a)
+            add_chance_node(tree, state, a) # Adduing nodes manyally anyway, I would remove the addition from the getters
             chance_id = get_chance_id(tree, state, a)
-            tree.c_qvalues[chance_id] = init_heuristic(mdp)
+            tree.c_qvalues[chance_id] = init_heuristic(mdp) # The init heuristic could conceivably also take the state?
             push!(tree.d_children[node_id], chance_id)
         end
 
@@ -230,13 +231,13 @@ end
 
 function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, initial_state::S) where {S}
     # Initialize tree and choose the first node
-    iteration_data = []
+    iteration_data = [] # unused?
     a = actions(mdp, initial_state)[1]
     tree = THTSTree{typeof(initial_state), typeof(a)}()
     add_decision_node(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
-    if solver.verbose
+    if solver.verbose # Proc je to tady i nize a neloguje to zadne hodnoty?
         open("iteration_values.csv", "w") do io
             CSV.write(io, DataFrame(Iteration = Int[], Value = Float64[]))
         end
@@ -246,7 +247,7 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
     end
 
     # Run thts algorithm
-    prev_v = 0
+    prev_v = 0 # unused?
     prev_t = tree
     for iter in 1:solver.iterations
         visit_d_node(tree, mdp, solver, root_id)
@@ -260,7 +261,7 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
                 CSV.write(io, DataFrame(Iteration = [iter], Value = [tree.d_values[1]]), append=true)
             end
         end
-        prev_t = deepcopy(tree)
+        prev_t = deepcopy(tree) # Tohle imo muze byt take docela performance bottleneck... Je to tu jen kvuli logovani? Pokud ano, nebylo by lepsi logging soupnout pred visit_d_node?
     end
     
     # return tree

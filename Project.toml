@@ -15,7 +15,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 D3Trees = "0.3.3"
 FiniteHorizonPOMDPs = "0.4.1"
-Logging = "1.11.0"
+Logging = "1"
 POMDPLinter = "0.1.2"
 POMDPTools = "1.1.0"
 POMDPs = "1.0.0"
