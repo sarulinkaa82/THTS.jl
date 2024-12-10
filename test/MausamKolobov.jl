@@ -12,7 +12,7 @@ end
 
 function POMDPs.states(mdp::MausamKolobov)
     # s5 is the goal state
-    states_ = ["s0", "s1", "s2", "s3", "s4", "s5"]
+    states_ = ["s0", "s1", "s2", "s3", "s4", "s5"] # why ?_?
     return states_
 end
 
@@ -36,7 +36,7 @@ end
 # actions
 
 function POMDPs.actions(mdp::MausamKolobov)
-    return ["a00", "a01", "a1", "a20", "a21", "a3", "a40", "a41", "exit"]
+    return ["a00", "a01", "a1", "a20", "a21", "a3", "a40", "a41", "exit"] # why "exit"? Action in terminal state needed?
 end
 
 function POMDPs.actions(mdp::MausamKolobov, s::String)
@@ -143,7 +143,7 @@ end
 
 # discount
 
-function POMDPs.discount(mdp::MausamKolobov)
+function POMDPs.discount(mdp::MausamKolobov) # Why discount?
     discountt = 0.95
     return discountt
 end
