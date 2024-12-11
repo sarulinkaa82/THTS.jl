@@ -1,15 +1,15 @@
 
-mutable struct THTSTree{S,A} # proc mutable?
+mutable struct THTSTree{S,A}
     d_node_ids::Dict{S, Int}
     c_node_ids::Dict{Tuple{S, A}, Int}
 
-    # decision nodes data
+    # Decision nodes data
     states::Vector{S}
     d_visits::Vector{Int}
     d_values::Vector{Float64}
     d_children::Vector{Vector{Int}}
 
-    # chance nodes data
+    # Chance nodes data
     state_actions::Vector{Tuple{S, A}}
     c_visits::Vector{Int}
     c_qvalues::Vector{Float64}
@@ -33,7 +33,7 @@ mutable struct THTSTree{S,A} # proc mutable?
 end
 
 
-function add_decision_node(tree::THTSTree{S, A}, state::S) where {S, A} # tohle by mohlo byt add_decision_node! protoze to meni tree a nic nevraci
+function add_decision_node!(tree::THTSTree{S, A}, state::S) where {S, A}
     if !haskey(tree.d_node_ids, state)
         state_id = length(tree.d_node_ids) + 1
         tree.d_node_ids[state] = state_id
@@ -44,7 +44,7 @@ function add_decision_node(tree::THTSTree{S, A}, state::S) where {S, A} # tohle 
     end
 end
 
-function add_chance_node(tree::THTSTree{S, A}, state::S, action::A) where {S, A} #dtto
+function add_chance_node!(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
     state_action = (state, action)
     if !haskey(tree.c_node_ids, state_action)
         action_id = length(tree.c_node_ids) + 1
@@ -56,9 +56,9 @@ function add_chance_node(tree::THTSTree{S, A}, state::S, action::A) where {S, A}
     end
 end
 
-function get_decision_id(tree::THTSTree{S, A}, state::S) where {S, A} #klidne bych byl explicitni a pojmenoval to get_decision_node_id, ale to je dost subjektivni. Spis by to stalo za prejmenovani, protoze to vyrabi novy node pokud tam neni, to je zavadejici
+function get_decision_id(tree::THTSTree{S, A}, state::S) where {S, A} #klidne bych byl explicitni a pojmenoval to get_decision_node_id
     if !haskey(tree.d_node_ids, state)
-        add_decision_node(tree, state)
+        throw("ERROR, attempting to acces id of a decision node that doesnt exist!")
     end
 
     return tree.d_node_ids[state]
@@ -68,7 +68,7 @@ end
 function get_chance_id(tree::THTSTree{S, A}, state::S, action::A) where {S, A} #dtto
     state_action = (state, action)
     if !haskey(tree.c_node_ids, state_action)
-        add_chance_node(tree, state, action)
+        throw("ERROR, attempting to acces id of a chance node that doesnt exist!")
     end
 
     return tree.c_node_ids[state_action]

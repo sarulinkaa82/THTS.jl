@@ -1,1 +1,4 @@
 Message,MaxUCT,DPUCT,UCTStar,MCTS
+Baseline - MausamKolobov,649,712,677,774
+Baseline - maze-7-A2,27296,12809,6268,41443
+Baseline - maze-15-A2,45159,47614,4548,40669

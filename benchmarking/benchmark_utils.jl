@@ -71,26 +71,34 @@ function rewrite_benchmark_files()
 end
 
 
-function benchmark_partial_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String)
+function benchmark_partial_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String, sample_n::Int)
     MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
     DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
     UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
     MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 1000, depth = 45)
     is = get_initial_state(fhm)
 
-    max_b = @benchmark base_thts($fhm, $MaxUCTSolver, $is)
+    println("Running $sample_n samples")
+    max_b = @benchmarkable base_thts($fhm, $MaxUCTSolver, $is)
+    max_res = run(max_b, samples = sample_n, seconds = 120)
     println("Benchmarking MaxUCT finished")
-    dp_b = @benchmark base_thts($fhm, $DPUCTSolver, $is)
+
+    dp_b = @benchmarkable base_thts($fhm, $DPUCTSolver, $is)
+    dp_res = run(dp_b, samples = sample_n, seconds = 120)
     println("Benchmarking DPUCT finished")
-    star_b = @benchmark base_thts($fhm, $UCTStarSolver, $is)
+    
+    star_b = @benchmarkable base_thts($fhm, $UCTStarSolver, $is)
+    star_res = run(star_b, samples = sample_n, seconds = 120)
     println("Benchmarking UCT* finished")
-    mcts_b = @benchmark one_mcts($fhm, $MSolver, $is)
+
+    mcts_b = @benchmarkable one_mcts($fhm, $MSolver, $is)
+    mcts_res = run(mcts_b, samples = sample_n, seconds = 120)
     println("Benchmarking MCTS finished")
 
-    max_time = mean(max_b).time
-    dp_time = mean(dp_b).time
-    star_time = mean(star_b).time
-    mcts_time = mean(mcts_b).time
+    max_time = median(max_res).time
+    dp_time = median(dp_res).time
+    star_time = median(star_res).time
+    mcts_time = median(mcts_res).time
 
     max_ft =  @sprintf("%.2f", max_time / 1e6)
     dp_ft =  @sprintf("%.2f", dp_time / 1e6)
@@ -102,10 +110,10 @@ function benchmark_partial_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, 
         UCTStar = [star_ft], MCTS = [mcts_ft]), append=true)
     end
 
-    max_mem = mean(max_b).memory
-    dp_mem = mean(dp_b).memory
-    star_mem = mean(star_b).memory
-    mcts_mem = mean(mcts_b).memory
+    max_mem = median(max_res).memory
+    dp_mem = median(dp_res).memory
+    star_mem = median(star_res).memory
+    mcts_mem = median(mcts_res).memory
     
     max_fm = @sprintf("%.0f", max_mem / 1024)
     dp_fm = @sprintf("%.0f", dp_mem / 1024)
@@ -135,29 +143,39 @@ function benchmark_partial_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, 
         pretty_table(io,m_data, header = header_m, header_alignment=:center)
     end
 
+    return (max_res, dp_res, star_res, mcts_res)
+
 end
 
 
 
-function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String)
+function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String, sample_n::Int)
     MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
     DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
     UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
     MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 1000, depth = 45)
 
-    max_b = @benchmark THTS.solve($MaxUCTSolver, $fhm)
+    println("Running $sample_n samples")
+    max_b = @benchmarkable THTS.solve($MaxUCTSolver, $fhm)
+    max_res = run(max_b, samples = sample_n, seconds = 120)
     println("Benchmarking MaxUCT finished")
-    dp_b = @benchmark THTS.solve($DPUCTSolver, $fhm)
+
+    dp_b = @benchmarkable THTS.solve($DPUCTSolver, $fhm)
+    dp_res = run(dp_b, samples = sample_n, seconds = 120)
     println("Benchmarking DPUCT finished")
-    star_b = @benchmark THTS.solve($UCTStarSolver, $fhm)
+    
+    star_b = @benchmarkable THTS.solve($UCTStarSolver, $fhm)
+    star_res = run(star_b, samples = sample_n, seconds = 120)
     println("Benchmarking UCT* finished")
-    mcts_b = @benchmark run_mcts($MSolver, $fhm)
+    
+    mcts_b = @benchmarkable run_mcts($MSolver, $fhm)
+    mcts_res = run(mcts_b, samples = sample_n, seconds = 120)
     println("Benchmarking MCTS finished")
 
-    max_time = mean(max_b).time
-    dp_time = mean(dp_b).time
-    star_time = mean(star_b).time
-    mcts_time = mean(mcts_b).time
+    max_time = median(max_res).time
+    dp_time = median(dp_res).time
+    star_time = median(star_res).time
+    mcts_time = median(mcts_res).time
 
     max_ft =  @sprintf("%.2f", max_time / 1e6)
     dp_ft =  @sprintf("%.2f", dp_time / 1e6)
@@ -169,10 +187,10 @@ function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper,
         UCTStar = [star_ft], MCTS = [mcts_ft]), append=true)
     end
 
-    max_mem = mean(max_b).memory
-    dp_mem = mean(dp_b).memory
-    star_mem = mean(star_b).memory
-    mcts_mem = mean(mcts_b).memory
+    max_mem = median(max_res).memory
+    dp_mem = median(dp_res).memory
+    star_mem = median(star_res).memory
+    mcts_mem = median(mcts_res).memory
     
     max_fm = @sprintf("%.0f", max_mem / 1024)
     dp_fm = @sprintf("%.0f", dp_mem / 1024)
@@ -201,6 +219,8 @@ function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper,
     open("benchmarking/results/complete_run_memory_results.txt", "w") do io
         pretty_table(io,m_data, header = header_m, header_alignment=:center)
     end
+    
+    return (max_res, dp_res, star_res, mcts_res)
 
 end
 

@@ -1,4 +1,4 @@
-function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper) # melo by to mit vic nez jeden argument? Na cem vsem muze zaviset init heuristic?
+function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int)
     return 0
 end
 
@@ -39,7 +39,7 @@ end
 Selects outcoming next state base on the probability of the outcomes
 Returns decision_id::Int of the next decision node
 """
-function select_outcome(outcomes::Dict{Int, Float64}) # Tohle vypada neefektivne, po jednom budovat v kazde iteraci novy vektor pro samplovani...
+function select_outcome(outcomes::Dict{Int, Float64})
     next_nodes = Vector{Int}()
     weights = Vector{Float64}()
     for (decision_node_id, prob) in outcomes
@@ -51,6 +51,10 @@ function select_outcome(outcomes::Dict{Int, Float64}) # Tohle vypada neefektivne
     next_state_id = sample(next_nodes, w)
     # println(next_state_id)
     return next_state_id
+    # decision_node_ids = keys(outcomes) |> collect
+    # weights = values(outcomes) |> collect
+    # w = Weights(weights)
+    # return sample(decision_node_ids, w)
 end
 
 """
@@ -140,7 +144,6 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
 end
 
 # udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru?
-# Proc je to mutable? 
 mutable struct THTSSolver <: Solver
     exploration_constant::Float64
     iterations::Int
@@ -178,9 +181,9 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
         acts = actions(mdp, state)
 
         for a in acts # create chance node, add it to d_nodes children
-            add_chance_node(tree, state, a) # Adduing nodes manyally anyway, I would remove the addition from the getters
+            add_chance_node!(tree, state, a)
             chance_id = get_chance_id(tree, state, a)
-            tree.c_qvalues[chance_id] = init_heuristic(mdp) # The init heuristic could conceivably also take the state?
+            tree.c_qvalues[chance_id] = init_heuristic(mdp, node_id)
             push!(tree.d_children[node_id], chance_id)
         end
 
@@ -204,9 +207,9 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
 
         for (next_state, prob) in weighted_iterator(distr)
             if !haskey(tree.d_node_ids, next_state) # if decision node doesnt exist yet
-                add_decision_node(tree, next_state)
+                add_decision_node!(tree, next_state)
                 next_d_id = get_decision_id(tree, next_state)
-                tree.d_values[next_d_id] = init_heuristic(mdp)
+                tree.d_values[next_d_id] = init_heuristic(mdp, node_id)
                 tree.c_children[node_id][next_d_id] = prob
             else    # if decision node exists in the tree already
                 next_d_id = get_decision_id(tree, next_state)
@@ -231,10 +234,9 @@ end
 
 function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTSSolver, initial_state::S) where {S}
     # Initialize tree and choose the first node
-    iteration_data = [] # unused?
     a = actions(mdp, initial_state)[1]
     tree = THTSTree{typeof(initial_state), typeof(a)}()
-    add_decision_node(tree, initial_state)
+    add_decision_node!(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     if solver.verbose # Proc je to tady i nize a neloguje to zadne hodnoty?
@@ -247,8 +249,6 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
     end
 
     # Run thts algorithm
-    prev_v = 0 # unused?
-    prev_t = tree
     for iter in 1:solver.iterations
         visit_d_node(tree, mdp, solver, root_id)
         
@@ -261,7 +261,6 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
                 CSV.write(io, DataFrame(Iteration = [iter], Value = [tree.d_values[1]]), append=true)
             end
         end
-        prev_t = deepcopy(tree) # Tohle imo muze byt take docela performance bottleneck... Je to tu jen kvuli logovani? Pokud ano, nebylo by lepsi logging soupnout pred visit_d_node?
     end
     
     # return tree
@@ -314,6 +313,6 @@ function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     all_s = stage_states(mdp, 1)
     all_states = collect(all_s)
 
-    return all_states[1]
+    return all_states[5]
 end
 

@@ -17,12 +17,10 @@ export MaxUCT_backpropagate_c
 export DPUCT_backpropagate_c
 export greedy_action
 export get_initial_state
+export prepare_d3tree
 
 include("tree_structure.jl")
 include("base.jl")
 include("visualization.jl")
-
-
-
 
 end

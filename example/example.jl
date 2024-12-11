@@ -54,8 +54,8 @@ savefig(p, "UCTSTar_convergence_h_02.png")
 function test_accuracy()
     hit = 0
     for i in 1:1000
-        act = base_thts(fhm, solver, is)
-        if act == :down
+        act = base_thts(mdp, MaxUCTSolver, is)
+        if act == "a41"
             hit += 1
         end
     end
@@ -139,3 +139,16 @@ simulate(sim, mdp, planner)
 
 statetype(mdp)
 statetype(mdp)
+
+
+include("MausamKolobov.jl")
+m = MausamKolobov()
+fhm = fixhorizon(m, 25)
+solver = THTSSolver(6.4, iterations = 5000, backup_function = DPUCT_backpropagate_c) # There should an option to seed the algorithm
+all_s = stage_states(fhm, 1)
+all_states = collect(all_s)
+state_test3 = all_states[5]
+act3 = base_thts(fhm, solver, state_test3)
+    
+
+
