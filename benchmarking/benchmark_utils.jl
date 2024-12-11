@@ -224,6 +224,73 @@ function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper,
 
 end
 
+function measure_improvement(str::String)
+    println("BENCHMARKING MausamKolobov...")
+    name = str * " - MausamKolobov"
+    mdp = MausamKolobov()
+    mdp = fixhorizon(mdp, 25)
+    benchmark_partial_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name,50)
+
+    println("BENCHMARKING maze-7")
+    name = str * " - maze-7-A2"
+    domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-7-A2.txt")
+    mdp = CustomDomain(size = domain_size, grid = grid_matrix)
+    mdp = fixhorizon(mdp, 80)
+    benchmark_partial_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name, 50)
+
+    println("BENCHMARKING maze-15")
+    name = str * " - maze-15-A2"
+    domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-15-A2.txt")
+    mdp = CustomDomain(size = domain_size, grid = grid_matrix)
+    mdp = fixhorizon(mdp, 80)
+    benchmark_partial_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name,50)
+end
+
+function process_benchmark_data(baseline_id::Int, csv_path::String, name::String)
+
+    csv_name = name * ".csv"
+    txt_name = name * ".txt"
+    open(csv_name, "w") do io
+        CSV.write(io, DataFrame(Message = String[], MaxUCT  = Float64[], DPUCT = Float64[], UCTStar = Float64[], MCTS = Float64[]))
+    end
+        
+    df = CSV.read(csv_path, DataFrame)
+    baseMax = df[baseline_id,"MaxUCT"]
+    baseDPUCT = df[baseline_id,"DPUCT"]
+    baseUCTStar = df[baseline_id,"UCTStar"]
+    baseMCTS = df[baseline_id,"MCTS"]
+
+    for row in eachrow(df)
+        newMax = row["MaxUCT"] ./ baseMax
+        newDPUCT = row["DPUCT"] ./baseDPUCT
+        newUCTStar = row["UCTStar"] ./baseUCTStar
+        newMCTS = row["MCTS"] ./baseMCTS
+
+        message = row["Message"]
+
+        max_ft =  @sprintf("%.2f", newMax)
+        dp_ft =  @sprintf("%.2f", newDPUCT)
+        star_ft =  @sprintf("%.2f", newUCTStar)
+        mcts_ft =  @sprintf("%.2f", newMCTS)
+        
+        open(csv_name, "a") do io
+            CSV.write(io, DataFrame(Message = [message], MaxUCT = [max_ft], DPUCT = [dp_ft], 
+            UCTStar = [star_ft], MCTS = [mcts_ft]), append=true)
+        end
+
+        data = CSV.File(csv_name) |> DataFrame
+        open(txt_name, "w") do io
+            pretty_table(io, data)
+        end
+
+    end
+end
+
+
+
 
 
 function run_mcts(msolver::MCTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)

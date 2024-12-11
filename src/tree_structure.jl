@@ -1,5 +1,5 @@
 
-mutable struct THTSTree{S,A}
+struct THTSTree{S,A}
     d_node_ids::Dict{S, Int}
     c_node_ids::Dict{Tuple{S, A}, Int}
 

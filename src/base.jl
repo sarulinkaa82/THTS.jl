@@ -144,7 +144,7 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
 end
 
 # udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru?
-mutable struct THTSSolver <: Solver
+struct THTSSolver <: Solver
     exploration_constant::Float64
     iterations::Int
     verbose::Bool 

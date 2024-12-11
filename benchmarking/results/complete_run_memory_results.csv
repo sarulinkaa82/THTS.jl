@@ -2,3 +2,6 @@ Message,MaxUCT,DPUCT,UCTStar,MCTS
 Baseline - MausamKolobov,647,710,688,793
 Baseline - maze-7-A2,482904,103671,43508,494400
 Baseline - maze-15-A2,1584558,1175118,287221,1822408
+Mutables - MausamKolobov,839,886,881,789
+Mutables - maze-7-A2,426660,123079,53446,809677
+Mutables - maze-15-A2,1894522,1513588,347787,1821273
