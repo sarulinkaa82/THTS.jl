@@ -40,21 +40,21 @@ Selects outcoming next state base on the probability of the outcomes
 Returns decision_id::Int of the next decision node
 """
 function select_outcome(outcomes::Dict{Int, Float64})
-    next_nodes = Vector{Int}()
-    weights = Vector{Float64}()
-    for (decision_node_id, prob) in outcomes
-        push!(next_nodes, decision_node_id)
-        push!(weights, Float64(prob))
-    end
+    # next_nodes = Vector{Int}()
+    # weights = Vector{Float64}()
+    # for (decision_node_id, prob) in outcomes
+    #     push!(next_nodes, decision_node_id)
+    #     push!(weights, Float64(prob))
+    # end
 
-    w = Weights(weights)
-    next_state_id = sample(next_nodes, w)
-    # println(next_state_id)
-    return next_state_id
-    # decision_node_ids = keys(outcomes) |> collect
-    # weights = values(outcomes) |> collect
     # w = Weights(weights)
-    # return sample(decision_node_ids, w)
+    # next_state_id = sample(next_nodes, w)
+    # # println(next_state_id)
+    # return next_state_id
+    decision_node_ids = keys(outcomes) |> collect
+    weights = values(outcomes) |> collect
+    w = Weights(weights)
+    return sample(decision_node_ids, w)
 end
 
 """

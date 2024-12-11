@@ -5,3 +5,6 @@ Baseline - maze-15-A2,2965.10,3472.98,486.74,5695.32
 Mutables - MausamKolobov,0.59,0.67,0.56,0.96
 Mutables - maze-7-A2,1886.97,197.07,88.82,5507.63
 Mutables - maze-15-A2,2874.99,3441.14,494.92,6328.24
+Outcomes - MausamKolobov,0.44,0.56,0.53,0.79
+Outcomes - maze-7-A2,1822.40,203.85,88.01,5463.73
+Outcomes - maze-15-A2,2819.46,3398.32,486.94,5813.52
