@@ -40,17 +40,6 @@ Selects outcoming next state base on the probability of the outcomes
 Returns decision_id::Int of the next decision node
 """
 function select_outcome(outcomes::Dict{Int, Float64})
-    # next_nodes = Vector{Int}()
-    # weights = Vector{Float64}()
-    # for (decision_node_id, prob) in outcomes
-    #     push!(next_nodes, decision_node_id)
-    #     push!(weights, Float64(prob))
-    # end
-
-    # w = Weights(weights)
-    # next_state_id = sample(next_nodes, w)
-    # # println(next_state_id)
-    # return next_state_id
     decision_node_ids = keys(outcomes) |> collect
     weights = values(outcomes) |> collect
     w = Weights(weights)
@@ -240,24 +229,16 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
     if solver.verbose # Proc je to tady i nize a neloguje to zadne hodnoty?
-        open("iteration_values.csv", "w") do io
+        open("benchmarking/iteration_values.csv", "w") do io
             CSV.write(io, DataFrame(Iteration = Int[], Value = Float64[]))
-        end
-        open("delta_values.csv", "w") do io
-            CSV.write(io, DataFrame(Iteration = Int[], Prev_Value = Float64[], Value = Float64[], P_c1_v = Float64[], c1_v = Float64[], P_c2_v = Float64[], c2_v = Float64[], p_c1_vis = Int[], c1_vis = Int[], P_c2_vis = Int[], c2_vis = Int[]))
         end
     end
 
     # Run thts algorithm
     for iter in 1:solver.iterations
         visit_d_node(tree, mdp, solver, root_id)
-        
         if solver.verbose && iter % (solver.iterations ÷ 1000) == 0
-            open("delta_values.csv", "a") do io
-                CSV.write(io, DataFrame(Iteration = [iter], Prev_Value = [prev_t.d_values[1]], Value = [tree.d_values[1]], P_c1_v = [prev_t.c_qvalues[1]], c1_v = [tree.c_qvalues[1]], P_c2_v = [prev_t.c_qvalues[2]], c2_v = [tree.c_qvalues[2]], p_c1_vis = [prev_t.c_visits[1]], c1_vis = [tree.c_visits[1]], P_c2_vis = [prev_t.c_visits[2]], c2_vis = [tree.c_visits[2]]), append=true)
-            end
-
-            open("iteration_values.csv", "a") do io
+            open("benchmarking/iteration_values.csv", "a") do io
                 CSV.write(io, DataFrame(Iteration = [iter], Value = [tree.d_values[1]]), append=true)
             end
         end
@@ -313,6 +294,6 @@ function get_initial_state(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper)
     all_s = stage_states(mdp, 1)
     all_states = collect(all_s)
 
-    return all_states[5]
+    return all_states[1]
 end
 

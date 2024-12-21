@@ -1,0 +1,22 @@
+MaxUCT mean r: -57.1, median r: -40.0, variance: 1156.2
+DPUCT mean r: -15.0, median r: -10.0, variance: 245.78947368421052
+UCT* mean r: -35.3, median r: -12.0, variance: 1738.747368421053
+MCTS mean r -41.05, median r: -40.0, variance: 42.681578947368415
+
+
+MaxUCT mean r: -48.166666666666664, median r: -40.0, std: 29.012581495921246
+DPUCT mean r: -16.266666666666666, median r: -9.0, std: 17.502577806856266
+UCT* mean r: -16.666666666666668, median r: -11.0, std: 16.388249224480266
+MCTS mean r -52.86666666666667, median r: -40.0, std: 43.55791494117905
+
+
+MaxUCT mean r: -51.45, median r: -40.0, std: 25.718346240249076
+DPUCT mean r: -21.025, median r: -10.0, std: 23.85155749362701
+UCT* mean r: -15.625, median r: -9.0, std: 20.17066605818383
+MCTS mean r -47.1, median r: -40.0, std: 33.527485854031895
+
+50 run on maze 7
+MaxUCT mean r: -47.62, median r: -40.0, std: 17.698022488402472
+DPUCT mean r: -26.64, median r: -11.0, std: 29.513580409218882
+UCT* mean r: -17.04, median r: -9.0, std: 20.994615441846516
+MCTS mean r -43.84, median r: -40.0, std: 28.879312558950406

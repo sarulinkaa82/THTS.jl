@@ -36,12 +36,20 @@ function avg_acc_reward(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, iters::
     d_median = median(d_reward)
     u_median = median(u_reward)
     m_median = median(m_reward)
-    
 
-    println("MaxUCT mean r: $x_mean, median r: $x_median")
-    println("DPUCT mean r: $d_mean, median r: $d_median")
-    println("UCT* mean r: $u_mean, median r: $u_median")
-    println("MCTS mean r $m_mean, median r: $m_median")
+    x_std = std(x_reward)
+    d_std = std(d_reward)
+    u_std = std(u_reward)
+    m_std = std(m_reward)
+
+    data = [x_reward, d_reward, u_reward, m_reward]
+
+    
+    println("MaxUCT mean r: $x_mean, median r: $x_median, std: $x_std")
+    println("DPUCT mean r: $d_mean, median r: $d_median, std: $d_std")
+    println("UCT* mean r: $u_mean, median r: $u_median, std: $u_std")
+    println("MCTS mean r $m_mean, median r: $m_median, std: $m_std")
+    return data
 end
 
 
@@ -312,4 +320,117 @@ function run_mcts(msolver::MCTSSolver, mdp::FiniteHorizonPOMDPs.FixedHorizonMDPW
     
     # println(path)
     return acc_reward
+end
+
+function values_after_run(iters::Int, mdp, solver)
+    values = []
+    is = get_initial_state(mdp)
+    println(is)
+    for i in 1:iters
+        tree = THTS.base_thts(mdp, solver, is)
+        push!(values, tree.d_values[1])
+    end
+
+    return values
+end
+
+function values_after_run(iters::Int, mdp)
+    msolver = MCTSSolver(n_iterations=5000, exploration_constant=2.4, depth = 25, rng=MersenneTwister(8))
+    
+    values = []
+    is = get_initial_state(mdp)
+    for i in 1:iters
+        planner = MCTS.solve(msolver, mdp)
+        is = get_initial_state(mdp)
+        MCTS.plan!(planner, is)
+        val = MCTS.value(planner, is)
+        push!(values, val)
+    end
+
+    return values
+end
+
+function get_convergence(mdp)
+
+    mctsdata = CSV.File("benchmarking/iteration_values copy.csv") |> DataFrame
+    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, verbose = true)
+    DPUCTSolver = THTSSolver(1.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, verbose = true)
+    UCTStarSolver = THTSSolver(1.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, verbose = true)
+    is = get_initial_state(mdp)
+    base_thts(mdp, MaxUCTSolver, is)
+    maxdata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
+    base_thts(mdp, DPUCTSolver, is)
+    dpdata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
+    base_thts(mdp, UCTStarSolver, is)
+    stardata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
+    p = plot(label="MaxUCT", maxdata.Iteration, maxdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
+    p = plot!(label="DP-UCT", maxdata.Iteration, dpdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
+    p = plot!(label="UCT*", maxdata.Iteration, stardata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
+    p = plot!(label="MCTS", mctsdata.Iteration, mctsdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
+end
+
+
+function generate_custom_latex_table(data, headers, caption, label)
+    # Construct the header row with bold formatting
+    header_row = join(["\\bfseries " * h for h in headers], " & ") * " \\\\ \\Midrule"
+    
+    # Construct the data rows
+    data_rows = [join(row, " & ") * " \\\\" for row in data]
+    
+    # Combine everything into the table structure
+    latex_table = """
+    \\begin{table}[h]
+    \\begin{ctucolortab}
+    \\caption{$caption}
+    \\begin{tabular}{cccccc}
+    $header_row
+    $(join(data_rows, " \n"))
+    \\end{tabular}
+    \\end{ctucolortab}
+    \\label{$label}
+    \\end{table}
+    """
+    
+    return latex_table
+end
+
+
+
+function get_value_stat()
+    mdp = MausamKolobov()
+    mdp = fixhorizon(mdp, 25)
+
+    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
+    DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
+    UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
+
+    maxuct = values_after_run(50, mdp, MaxUCTSolver)
+    plot(maxuct)
+    dpuct = values_after_run(50, mdp, DPUCTSolver)
+    uctstar = values_after_run(50, mdp, UCTStarSolver)
+    mcts = values_after_run(50, mdp)
+
+
+    # Combine the data into a vector of vectors
+    data = [maxuct, dpuct, uctstar, mcts]
+
+    # Create the boxplot
+    boxplot(data,
+        labels=["MaxUCT", "DPUCT", "UCTStar", "MCTS"],  # Names for each group
+        xlabel="Algorithms",
+        ylabel="Value",
+        title="Values after partial runs",
+        xticks=(1:4, ["MaxUCT", "DPUCT", "UCTStar", "MCTS"]),  # Set custom x-axis labels
+        legend=false
+    )
+    hline!([-5.992], label="Correct Value", linestyle=:dash, color=:green)
+end
+
+function bench_to_table(path::String, caption::String, label::String)
+    df = CSV.read(path, DataFrame)
+    headers = names(df)
+    data = [collect(row) for row in eachrow(df)]
+
+    latex_code = generate_custom_latex_table(data, headers, caption, label)
+    print(latex_code)
 end

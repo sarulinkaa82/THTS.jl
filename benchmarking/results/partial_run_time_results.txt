@@ -11,4 +11,22 @@
 │        Outcomes - MausamKolobov │   0.32 │   0.36 │    0.36 │   0.63 │
 │            Outcomes - maze-7-A2 │  42.09 │   18.3 │    9.77 │ 122.39 │
 │           Outcomes - maze-15-A2 │  79.02 │  86.12 │    6.76 │ 123.06 │
+│       InitState - MausamKolobov │   0.81 │    0.9 │    0.86 │   1.19 │
+│       InitState - MausamKolobov │   0.77 │    0.8 │     0.8 │   1.06 │
+│           InitState - maze-7-A2 │  40.23 │  15.62 │    6.96 │ 116.55 │
+│          InitState - maze-15-A2 │  81.78 │  91.99 │    9.11 │ 136.48 │
+│      Retry base - MausamKolobov │   0.79 │   0.84 │    0.81 │   1.12 │
+│          Retry base - maze-7-A2 │  40.94 │  15.06 │    6.24 │ 115.34 │
+│         Retry base - maze-15-A2 │ 161.39 │  187.4 │   19.62 │ 214.19 │
+│            Retry base - maze 25 │  30.72 │   37.7 │    7.28 │  68.71 │
+│            Retry base - maze 25 │  60.65 │  70.93 │    7.26 │ 109.62 │
+│            Retry base - maze 25 │  60.07 │  75.43 │    7.31 │ 111.31 │
+│            Retry base - maze 25 │  68.33 │  82.96 │    8.36 │ 120.16 │
+│          Retry base - maze-7-A2 │   12.9 │    9.1 │    7.09 │  49.85 │
+│         Retry base - maze-15-A2 │  53.16 │  62.48 │    8.81 │ 107.31 │
+│         Retry base - maze-25-A2 │ 115.21 │ 142.25 │    7.44 │ 146.96 │
+│          Retry base - maze-7-A2 │  12.66 │   8.86 │    6.11 │  37.67 │
+│         Retry base - maze-15-A2 │  45.82 │  55.65 │    8.87 │  97.08 │
+│         Retry base - maze-25-A2 │  99.93 │ 119.93 │    7.67 │ 126.17 │
+│         Retry base - maze-51-A2 │ 153.14 │ 187.76 │    8.03 │ 124.09 │
 └─────────────────────────────────┴────────┴────────┴─────────┴────────┘

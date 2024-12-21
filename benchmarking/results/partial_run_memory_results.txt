@@ -11,4 +11,22 @@
 │        Outcomes - MausamKolobov │       607 │    691 │     662 │   782 │
 │            Outcomes - maze-7-A2 │     27450 │  12890 │    6362 │ 41397 │
 │           Outcomes - maze-15-A2 │     46136 │  48869 │    4732 │ 40579 │
+│       InitState - MausamKolobov │      1091 │   1373 │    1303 │   897 │
+│       InitState - MausamKolobov │      1281 │   1368 │    1313 │   892 │
+│           InitState - maze-7-A2 │     24476 │  10567 │    4575 │ 37894 │
+│          InitState - maze-15-A2 │     42031 │  47953 │    6002 │ 41809 │
+│      Retry base - MausamKolobov │      1243 │   1367 │    1304 │   890 │
+│          Retry base - maze-7-A2 │     24688 │  10659 │    4575 │ 36819 │
+│         Retry base - maze-15-A2 │     42032 │  48022 │    6000 │ 41802 │
+│            Retry base - maze 25 │     19810 │  22197 │    5380 │ 24105 │
+│            Retry base - maze 25 │     35839 │  43302 │    5118 │ 38216 │
+│            Retry base - maze 25 │     37573 │  45768 │    5385 │ 38801 │
+│            Retry base - maze 25 │     42114 │  47988 │    5999 │ 41874 │
+│          Retry base - maze-7-A2 │      9397 │   6377 │    4573 │ 13449 │
+│         Retry base - maze-15-A2 │     29699 │  34211 │    5994 │ 33576 │
+│         Retry base - maze-25-A2 │     56209 │  65043 │    5119 │ 41654 │
+│          Retry base - maze-7-A2 │      9421 │   6392 │    4572 │ 13486 │
+│         Retry base - maze-15-A2 │     29732 │  34212 │    5999 │ 33598 │
+│         Retry base - maze-25-A2 │     56276 │  65141 │    5135 │ 41459 │
+│         Retry base - maze-51-A2 │     84702 │  98866 │    5740 │ 45014 │
 └─────────────────────────────────┴───────────┴────────┴─────────┴───────┘
