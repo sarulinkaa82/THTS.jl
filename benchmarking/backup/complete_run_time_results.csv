@@ -1,0 +1,26 @@
+Message,MaxUCT,DPUCT,UCTStar,MCTS
+Baseline - MausamKolobov,0.39,0.54,0.76,0.88
+Baseline - maze-7-A2,1913.55,202.14,85.03,5256.26
+Baseline - maze-15-A2,2965.10,3472.98,486.74,5695.32
+Mutables - MausamKolobov,0.59,0.67,0.56,0.96
+Mutables - maze-7-A2,1886.97,197.07,88.82,5507.63
+Mutables - maze-15-A2,2874.99,3441.14,494.92,6328.24
+Outcomes - MausamKolobov,0.44,0.56,0.53,0.79
+Outcomes - maze-7-A2,1822.40,203.85,88.01,5463.73
+Outcomes - maze-15-A2,2819.46,3398.32,486.94,5813.52
+InitState - MausamKolobov,2.33,2.52,2.55,3.52
+InitState - maze-7-A2,1910.18,138.28,47.68,5842.41
+InitState - maze-15-A2,2983.54,3726.86,535.26,6031.15
+Retry base - MausamKolobov,2.10,2.35,2.20,2.48
+Retry base - maze-7-A2,1767.73,88.97,36.03,5175.83
+Retry base - maze-15-A2,3825.63,3557.55,502.05,6308.59
+Baseline - maze-7-A2,195.54,65.22,53.96,601.84
+Baseline - maze-15-A2,1779.19,2190.69,438.26,3709.17
+Baseline - maze-25-A2,5425.09,7450.88,753.00,9451.00
+Baseline - maze-7-A2,160.85,57.22,40.74,505.07
+Baseline - maze-15-A2,1424.21,1726.44,352.54,3132.52
+Baseline - maze-25-A2,4522.98,6742.51,666.78,8354.33
+Baseline - maze-51-A2,11052.33,14770.61,1021.64,14265.20
+Retry base - MausamKolobov,1.78,2.26,2.51,2.58
+Retry base - maze-7-A2,1891.31,117.56,41.34,5176.00
+Retry base - maze-15-A2,2643.42,3262.12,489.19,5523.96

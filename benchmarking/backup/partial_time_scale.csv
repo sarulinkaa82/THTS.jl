@@ -1,0 +1,10 @@
+Message,MaxUCT,DPUCT,UCTStar,MCTS
+Baseline - MausamKolobov,0.01,0.00,0.07,0.01
+Baseline - maze-7-A2,0.64,0.23,1.42,0.98
+Baseline - maze-15-A2,1.00,1.00,1.00,1.00
+Mutables - MausamKolobov,0.01,0.01,0.08,0.01
+Mutables - maze-7-A2,0.62,0.23,1.41,1.01
+Mutables - maze-15-A2,1.06,1.01,1.11,1.01
+Outcomes - MausamKolobov,0.00,0.00,0.05,0.01
+Outcomes - maze-7-A2,0.55,0.21,1.40,1.00
+Outcomes - maze-15-A2,1.03,1.00,0.97,1.00

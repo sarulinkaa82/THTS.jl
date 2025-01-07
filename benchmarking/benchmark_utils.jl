@@ -2,10 +2,10 @@ using Statistics
 
 
 function avg_acc_reward(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, iters::Int)
-    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
-    DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
-    UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
-    MCTSSolver = MCTS.MCTSSolver(exploration_constant=6.4, n_iterations = 1000, depth = 45)
+    MaxUCTSolver = THTSSolver(7.0, iterations = 1000000000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, max_time=0.5, heuristic = euclidean_heuristic)
+    DPUCTSolver = THTSSolver(3.4, iterations = 1000000000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, max_time=0.5, heuristic = euclidean_heuristic)
+    UCTStarSolver = THTSSolver(3.4, iterations = 1000000000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, max_time=0.5, heuristic = euclidean_heuristic)
+    MCTSSolver = MCTS.MCTSSolver(exploration_constant=6.4, n_iterations = 1000000000, depth = 75, max_time = 0.5)
     
     x_reward = []
     d_reward = []
@@ -15,9 +15,13 @@ function avg_acc_reward(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, iters::
 
     for i in 1:iters
         xr = THTS.solve(MaxUCTSolver, mdp)
+        println("MaxUCT finished")
         dr = THTS.solve(DPUCTSolver, mdp)
+        println("DP-UCT finished")
         ur = THTS.solve(UCTStarSolver, mdp)
+        println("UCTStar finished")
         mr = run_mcts(MCTSSolver, mdp)
+        println("MCTS finished")
 
         push!(x_reward, xr)
         push!(d_reward, dr)
@@ -25,6 +29,7 @@ function avg_acc_reward(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, iters::
         push!(m_reward, mr)
 
         println("Iteration $i finished")
+        println()
     end
 
     x_mean = mean(x_reward)
@@ -80,10 +85,10 @@ end
 
 
 function benchmark_partial_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String, sample_n::Int)
-    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
-    DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
-    UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
-    MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 1000, depth = 45)
+    MaxUCTSolver = THTSSolver(7.0, iterations = 5000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, heuristic = euclidean_heuristic)
+    DPUCTSolver = THTSSolver(3.4, iterations = 5000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, heuristic = euclidean_heuristic)
+    UCTStarSolver = THTSSolver(3.4, iterations = 5000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, heuristic = euclidean_heuristic)
+    MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 5000, depth = 45)
     is = get_initial_state(fhm)
 
     println("Running $sample_n samples")
@@ -158,10 +163,10 @@ end
 
 
 function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, message::String, sample_n::Int)
-    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false)
-    DPUCTSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false)
-    UCTStarSolver = THTSSolver(3.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true)
-    MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 1000, depth = 45)
+    MaxUCTSolver = THTSSolver(7.0, iterations = 5000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, heuristic = euclidean_heuristic)
+    DPUCTSolver = THTSSolver(3.4, iterations = 5000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, heuristic = euclidean_heuristic)
+    UCTStarSolver = THTSSolver(3.4, iterations = 5000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, heuristic = euclidean_heuristic)
+    MSolver = MCTSSolver(exploration_constant = 6.4, n_iterations = 5000, depth = fhm.horizon)
 
     println("Running $sample_n samples")
     max_b = @benchmarkable THTS.solve($MaxUCTSolver, $fhm)
@@ -233,28 +238,44 @@ function benchmark_complete_run(fhm::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper,
 end
 
 function measure_improvement(str::String)
-    println("BENCHMARKING MausamKolobov...")
-    name = str * " - MausamKolobov"
-    mdp = MausamKolobov()
-    mdp = fixhorizon(mdp, 25)
-    benchmark_partial_run(mdp, name, 50)
-    benchmark_complete_run(mdp, name,50)
+    # println("BENCHMARKING MausamKolobov...")
+    # name = str * " - MausamKolobov"
+    # mdp = MausamKolobov()
+    # mdp = fixhorizon(mdp, 25)
+    # benchmark_partial_run(mdp, name, 50)
+    # benchmark_complete_run(mdp, name, 20)
 
     println("BENCHMARKING maze-7")
     name = str * " - maze-7-A2"
     domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-7-A2.txt")
     mdp = CustomDomain(size = domain_size, grid = grid_matrix)
-    mdp = fixhorizon(mdp, 80)
+    mdp = fixhorizon(mdp, 20)
     benchmark_partial_run(mdp, name, 50)
-    benchmark_complete_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name, 20)
 
     println("BENCHMARKING maze-15")
     name = str * " - maze-15-A2"
     domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-15-A2.txt")
     mdp = CustomDomain(size = domain_size, grid = grid_matrix)
+    mdp = fixhorizon(mdp, 40)
+    benchmark_partial_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name, 20)
+
+    println("BENCHMARKING maze-25")
+    name = str * " - maze-25-A2"
+    domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-25-A2.txt")
+    mdp = CustomDomain(size = domain_size, grid = grid_matrix)
     mdp = fixhorizon(mdp, 80)
     benchmark_partial_run(mdp, name, 50)
-    benchmark_complete_run(mdp, name,50)
+    benchmark_complete_run(mdp, name, 20)
+
+    println("BENCHMARKING maze-51")
+    name = str * " - maze-51-A2"
+    domain_size, grid_matrix = generate_test_domain("benchmarking/data/maze-51-A2.txt")
+    mdp = CustomDomain(size = domain_size, grid = grid_matrix)
+    mdp = fixhorizon(mdp, 100)
+    benchmark_partial_run(mdp, name, 50)
+    benchmark_complete_run(mdp, name, 20)
 end
 
 function process_benchmark_data(baseline_id::Int, csv_path::String, name::String)
@@ -353,9 +374,9 @@ end
 function get_convergence(mdp)
 
     mctsdata = CSV.File("benchmarking/iteration_values copy.csv") |> DataFrame
-    MaxUCTSolver = THTSSolver(7.0, iterations = 1000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, verbose = true)
-    DPUCTSolver = THTSSolver(1.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, verbose = true)
-    UCTStarSolver = THTSSolver(1.4, iterations = 1000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, verbose = true)
+    MaxUCTSolver = THTSSolver(7.0, iterations = 4000, backup_function = MaxUCT_backpropagate_c, enable_UCTStar = false, verbose = true, heuristic = euclidean_heuristic)
+    DPUCTSolver = THTSSolver(1.4, iterations = 10000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = false, verbose = true, heuristic = euclidean_heuristic)
+    UCTStarSolver = THTSSolver(1.4, iterations = 10000, backup_function = DPUCT_backpropagate_c, enable_UCTStar = true, verbose = true, heuristic = euclidean_heuristic)
     is = get_initial_state(mdp)
     base_thts(mdp, MaxUCTSolver, is)
     maxdata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
@@ -363,10 +384,10 @@ function get_convergence(mdp)
     dpdata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
     base_thts(mdp, UCTStarSolver, is)
     stardata = CSV.File("benchmarking/iteration_values.csv") |> DataFrame
-    p = plot(label="MaxUCT", maxdata.Iteration, maxdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
-    p = plot!(label="DP-UCT", maxdata.Iteration, dpdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
-    p = plot!(label="UCT*", maxdata.Iteration, stardata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
-    p = plot!(label="MCTS", mctsdata.Iteration, mctsdata.Value, xlabel="Iteration", ylabel="Value", title="Value over Iterations")
+    # p = plot(label="MaxUCT", maxdata.Iteration, maxdata.Value, xlabel="Iteration", ylabel="Value", title="Convergence plot")
+    p = plot(label="DP-UCT", maxdata.Iteration, dpdata.Value, xlabel="Iteration", ylabel="Value", title="Convergence plot")
+    p = plot!(label="UCT*", maxdata.Iteration, stardata.Value, xlabel="Iteration", ylabel="Value", title="Convergence plot")
+    p = plot!(label="MCTS", mctsdata.Iteration, mctsdata.Value, xlabel="Iteration", ylabel="Value", title="Convergence plot")
 end
 
 

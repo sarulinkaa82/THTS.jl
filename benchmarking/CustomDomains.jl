@@ -18,8 +18,8 @@ Base.@kwdef struct CustomDomain <: MDP{GWCoords, Symbol}
     size::Tuple{Int64, Int64}
     grid::Matrix
     t_prob::Float64                = 0.7
-    discount::Float64              = 0.99
-    rewards::Dict{String, Float64} = Dict("step" => -1.0, "E" => 0.0, "D" => -50.0)
+    discount::Float64              = 1
+    rewards::Dict{String, Float64} = Dict("step" => -1.0, "E" => 50.0, "D" => -50.0)
 end
 
 # init domain like:

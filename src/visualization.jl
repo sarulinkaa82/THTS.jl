@@ -9,7 +9,7 @@ function prepare_d3tree(tree::THTSTree, root_state; title="THTS Tree")
     while !isempty(decision_queue)
         state, parent_idx = popfirst!(decision_queue)
         i += 1
-        if i > 10000
+        if i > 100000
             break
         end
         println("processin $state")

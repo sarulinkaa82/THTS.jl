@@ -1,6 +1,22 @@
-function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, node_id::Int)
+function init_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, tree::THTSTree, node_id::Int)
     return 0
 end
+
+
+function euclidean_heuristic(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, tree::THTSTree, node_id::Integer)
+    state = tree.states[node_id]
+    state = first(state)
+    x = state.x
+    y = state.y
+    # println(state)
+
+    goal_x = mdp.m.size[1] - 1
+    goal_y = mdp.m.size[2] - 1
+    dist = abs(x - goal_x) + abs(y - goal_y)
+    # println(dist)
+    return dist
+end
+
 
 """
 Selects best action according to chosen criteria\n
@@ -132,23 +148,26 @@ function greedy_action(tree::THTSTree{S, A}, node_id) where {S, A}
     return max_act
 end
 
-# udelat tu backup funkci pres multiple dispatch pres ruzny typy solveru?
 struct THTSSolver <: Solver
     exploration_constant::Float64
     iterations::Int
     verbose::Bool 
     backup_function::Function
     enable_UCTStar::Bool
+    max_time::Float64
+    heuristic::Function
 
     # default constructor
     function THTSSolver(exploration_constant;
         iterations::Int = 10,
         verbose::Bool = false,
         backup_function::Function = backpropagate_c,
-        enable_UCTStar::Bool = false
+        enable_UCTStar::Bool = false,
+        max_time::Float64 = 100000000.0,
+        heuristic::Function = init_heuristic
         )    
 
-        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar)
+        return new(exploration_constant, iterations, verbose, backup_function, enable_UCTStar, max_time, heuristic)
     end
 end
 
@@ -172,7 +191,7 @@ function visit_d_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
         for a in acts # create chance node, add it to d_nodes children
             add_chance_node!(tree, state, a)
             chance_id = get_chance_id(tree, state, a)
-            tree.c_qvalues[chance_id] = init_heuristic(mdp, node_id)
+            tree.c_qvalues[chance_id] = 0 #init_heuristic(mdp, node_id)
             push!(tree.d_children[node_id], chance_id)
         end
 
@@ -198,7 +217,8 @@ function visit_c_node(tree::THTSTree{S, A}, mdp::FiniteHorizonPOMDPs.FixedHorizo
             if !haskey(tree.d_node_ids, next_state) # if decision node doesnt exist yet
                 add_decision_node!(tree, next_state)
                 next_d_id = get_decision_id(tree, next_state)
-                tree.d_values[next_d_id] = init_heuristic(mdp, node_id)
+                # tree.d_values[next_d_id] = init_heuristic(mdp, next_d_id)
+                tree.d_values[next_d_id] = solver.heuristic(mdp, tree, next_d_id)
                 tree.c_children[node_id][next_d_id] = prob
             else    # if decision node exists in the tree already
                 next_d_id = get_decision_id(tree, next_state)
@@ -228,14 +248,21 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
     add_decision_node!(tree, initial_state)
     root_id = get_decision_id(tree, initial_state) # should be 1 tho
 
-    if solver.verbose # Proc je to tady i nize a neloguje to zadne hodnoty?
+    if solver.verbose
         open("benchmarking/iteration_values.csv", "w") do io
             CSV.write(io, DataFrame(Iteration = Int[], Value = Float64[]))
         end
     end
 
+    start_time = time()
     # Run thts algorithm
     for iter in 1:solver.iterations
+        elapsed_time = time() - start_time
+        if elapsed_time > solver.max_time
+            # println("Stopping algorithm: Time limit of $(solver.max_time) seconds exceeded.")
+            break
+        end
+
         visit_d_node(tree, mdp, solver, root_id)
         if solver.verbose && iter % (solver.iterations ÷ 1000) == 0
             open("benchmarking/iteration_values.csv", "a") do io
@@ -244,8 +271,8 @@ function base_thts(mdp::FiniteHorizonPOMDPs.FixedHorizonMDPWrapper, solver::THTS
         end
     end
     
-    # return tree
-    return greedy_action(tree, root_id)
+    return tree
+    # return greedy_action(tree, root_id)
 end
 
 

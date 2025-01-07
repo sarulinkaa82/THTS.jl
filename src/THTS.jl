@@ -6,6 +6,7 @@ using POMDPTools
 using StatsBase
 using CSV
 using DataFrames
+using Dates
 
 export solve
 export THTSTree
@@ -20,6 +21,8 @@ export DPUCT_backpropagate_c
 export greedy_action
 export get_initial_state
 export prepare_d3tree
+export euclidean_heuristic
+export init_heuristic
 
 include("tree_structure.jl")
 include("base.jl")

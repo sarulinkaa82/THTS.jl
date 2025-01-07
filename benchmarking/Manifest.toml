@@ -2,7 +2,7 @@
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "d0a1c6fb8a57fe52e71572e799f6b936b7d023af"
+project_hash = "aabe2926a46e0708403fe23a1041a2bc64d8b65f"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1269,7 +1269,7 @@ uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "7.7.0+0"
 
 [[deps.THTS]]
-deps = ["CSV", "D3Trees", "DataFrames", "FiniteHorizonPOMDPs", "Logging", "POMDPLinter", "POMDPTools", "POMDPs", "StatsBase"]
+deps = ["CSV", "D3Trees", "DataFrames", "Dates", "FiniteHorizonPOMDPs", "Logging", "POMDPLinter", "POMDPTools", "POMDPs", "StatsBase"]
 path = ".."
 uuid = "6a918302-f22c-4708-a42c-c3d98e732581"
 version = "1.0.0-DEV"
